@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RO Hugel Race Manager v2</title>
+    <title>RO Hugel Race Manager v3 (Save & Withdraw)</title>
     <style>
         :root {
             --bg-color: #1a1a2e;
@@ -61,7 +61,17 @@
         .btn-primary:hover { background-color: #c72c41; }
         .btn-undo { background-color: #ff9800; color: black; }
         
-        /* Game Mode Toggle */
+        /* Reset Button Style */
+        .btn-reset { 
+            background-color: #2a2a2a; 
+            color: #ff5252; 
+            border: 1px solid #ff5252;
+            margin-top: 30px;
+            padding: 10px 20px;
+        }
+        .btn-reset:hover { background-color: #ff5252; color: white; }
+        
+        /* Game Mode */
         .mode-selector {
             display: flex;
             justify-content: center;
@@ -70,17 +80,8 @@
             padding: 5px;
             border-radius: 8px;
         }
-        .mode-btn {
-            flex: 1;
-            background: transparent;
-            color: #888;
-            padding: 8px;
-        }
-        .mode-btn.active {
-            background: var(--accent-color);
-            color: white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
+        .mode-btn { flex: 1; background: transparent; color: #888; padding: 8px; }
+        .mode-btn.active { background: var(--accent-color); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 
         /* Character Cards */
         .char-grid {
@@ -92,6 +93,7 @@
         .char-card {
             background: #0f3460;
             padding: 10px;
+            padding-top: 25px; /* Space for buttons */
             border-radius: 8px;
             text-align: center;
             border: 1px solid #533483;
@@ -100,31 +102,32 @@
         .zeny-text { color: var(--zeny-color); font-weight: bold; }
         .medal-text { color: #00bcd4; font-size: 0.9em; }
         
-        /* Add Money Button */
-        .btn-add-money {
+        /* Money Buttons (+ / -) */
+        .money-btn-group {
             position: absolute;
             top: 5px;
             right: 5px;
-            width: 24px;
-            height: 24px;
+            display: flex;
+            gap: 3px;
+        }
+        .btn-mini {
+            width: 22px;
+            height: 22px;
             padding: 0;
-            background: #4caf50;
-            color: white;
-            font-size: 16px;
-            line-height: 24px;
-            border-radius: 50%;
+            font-size: 14px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: white;
         }
-        .btn-add-money:hover { background: #66bb6a; }
+        .btn-add { background: #4caf50; }
+        .btn-add:hover { background: #66bb6a; }
+        .btn-sub { background: #f44336; }
+        .btn-sub:hover { background: #ef5350; }
 
-        /* Monster Selector */
-        .monster-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
+        /* Monster Grid */
+        .monster-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
         .monster-btn {
             background: #2b2b40;
             color: white;
@@ -132,16 +135,12 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100px;
+            height: 90px;
             border: 2px solid transparent;
             transition: 0.2s;
         }
-        .monster-btn:hover { background: #33334d; }
-        .monster-btn.selected {
-            border-color: var(--accent-color);
-            background: #3a3a55;
-        }
-        .monster-img { font-size: 2rem; margin-bottom: 5px; }
+        .monster-btn.selected { border-color: var(--accent-color); background: #3a3a55; }
+        .monster-img { font-size: 1.8rem; margin-bottom: 2px; }
         
         .step-box {
             background: rgba(0,0,0,0.2);
@@ -151,21 +150,14 @@
             border-radius: 4px;
         }
 
-        /* Tables & Charts */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
         th, td { border-bottom: 1px solid #333; padding: 8px; text-align: left; }
-        th { color: #888; font-weight: 600; }
         .win-row { color: var(--win-color); }
         .lose-row { color: #888; }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            text-align: center;
-        }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
         .stat-box { background: #0f3460; padding: 10px; border-radius: 5px; }
-        .stat-val { font-size: 1.4rem; font-weight: bold; margin-top: 5px;}
+        .stat-val { font-size: 1.2rem; font-weight: bold; }
 
         .chart-wrapper {
             background: #0f3460;
@@ -176,34 +168,21 @@
             flex-direction: column;
             align-items: center;
         }
-        .pie-chart {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: #333;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-        .chart-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-            font-size: 0.85rem;
-        }
+        .pie-chart { width: 140px; height: 140px; border-radius: 50%; background: #333; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .chart-legend { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 15px; font-size: 0.75rem; }
         .legend-item { display: flex; align-items: center; }
-        .legend-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
-
+        .legend-color { width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
     </style>
 </head>
 <body>
 
-    <h1>🏰 Hugel Race Manager v2</h1>
+    <h1>🏰 Hugel Race Manager v3</h1>
+    <h3 style="color:#666; font-size:0.9rem; margin-top:-10px;">(Auto-Saves to Browser)</h3>
 
     <div class="panel full-width" style="display: flex; justify-content: space-between; align-items: center; max-width:1000px;">
         <div style="display: flex; gap: 15px; align-items: center;">
-            <label>Ticket (Zeny): <input type="number" id="ticketCost" value="2000" style="width:80px;"></label>
-            <label>Reward (Medals): <input type="number" id="medalReward" value="15" style="width:60px;"></label>
+            <label>Ticket (Zeny): <input type="number" id="ticketCost" value="2000" style="width:80px;" onchange="saveSettings()"></label>
+            <label>Reward (Medals): <input type="number" id="medalReward" value="15" style="width:60px;" onchange="saveSettings()"></label>
         </div>
         <button class="btn-undo" onclick="undoLast()">↩ Undo Last</button>
     </div>
@@ -288,6 +267,8 @@
         </div>
     </div>
 
+    <button class="btn-reset" onclick="hardReset()">⚠️ Reset All Data</button>
+
 <script>
     const monsterColors = { 1: '#4fc3f7', 2: '#fff176', 3: '#a1887f', 4: '#e0e0e0', 5: '#ba68c8', 6: '#ff8a65' };
     const monsters = [
@@ -303,25 +284,65 @@
     let history = []; 
     let currentBet = [];
     let currentResult = [];
-    let gameMode = 'single'; // 'single' or 'double'
+    let gameMode = 'single';
 
+    // --- SAVE / LOAD SYSTEM ---
+    function saveData() {
+        localStorage.setItem('hugel_v3_chars', JSON.stringify(characters));
+        localStorage.setItem('hugel_v3_history', JSON.stringify(history));
+        localStorage.setItem('hugel_v3_settings', JSON.stringify({
+            ticket: document.getElementById('ticketCost').value,
+            reward: document.getElementById('medalReward').value,
+            mode: gameMode
+        }));
+    }
+
+    function loadData() {
+        const savedChars = localStorage.getItem('hugel_v3_chars');
+        const savedHistory = localStorage.getItem('hugel_v3_history');
+        const savedSettings = localStorage.getItem('hugel_v3_settings');
+
+        if (savedChars) characters = JSON.parse(savedChars);
+        if (savedHistory) history = JSON.parse(savedHistory);
+        if (savedSettings) {
+            const s = JSON.parse(savedSettings);
+            document.getElementById('ticketCost').value = s.ticket || 2000;
+            document.getElementById('medalReward').value = s.reward || 15;
+            setMode(s.mode || 'single');
+        } else {
+            setMode('single');
+        }
+    }
+
+    function hardReset() {
+        if(confirm("WARNING: This will delete ALL characters, history, and settings. Are you sure?")) {
+            localStorage.removeItem('hugel_v3_chars');
+            localStorage.removeItem('hugel_v3_history');
+            localStorage.removeItem('hugel_v3_settings');
+            location.reload();
+        }
+    }
+
+    function saveSettings() {
+        saveData(); // Save inputs when changed
+    }
+
+    // --- INIT ---
     window.onload = function() {
+        loadData(); // Load saved data first
         renderMonsterGrid('betGrid', selectBet);
         renderMonsterGrid('resultGrid', selectResult);
-        setMode('single'); // Default start
-        updateUI();
+        recalculateAll(); // Update UI with loaded data
     };
 
     function setMode(mode) {
         gameMode = mode;
         resetSelection();
         
-        // Update Buttons
         document.getElementById('btnSingle').className = mode === 'single' ? 'mode-btn active' : 'mode-btn';
         document.getElementById('btnDouble').className = mode === 'double' ? 'mode-btn active' : 'mode-btn';
-        
-        // Update Title
         document.getElementById('step1Title').innerText = mode === 'single' ? '1. Pick 1 Monster' : '1. Pick 2 Monsters';
+        saveSettings();
     }
 
     function renderMonsterGrid(elementId, clickHandler) {
@@ -345,11 +366,10 @@
             currentBet = currentBet.filter(x => x !== id);
             btn.classList.remove('selected');
         } else {
-            // If Single mode, clicking a new one should replace the old one
             if (gameMode === 'single' && currentBet.length >= 1) {
-                // Remove existing selection styling
                 const oldId = currentBet[0];
-                document.querySelector(`#betGrid button[data-id="${oldId}"]`).classList.remove('selected');
+                const oldBtn = document.querySelector(`#betGrid button[data-id="${oldId}"]`);
+                if(oldBtn) oldBtn.classList.remove('selected');
                 currentBet = [];
             }
             
@@ -397,10 +417,8 @@
         const resultSet = new Set(currentResult);
 
         if (gameMode === 'single') {
-            // Win if the selected single monster is inside the top 2 results
             isWin = resultSet.has(currentBet[0]);
         } else {
-            // Win if both selected monsters are the top 2
             const betSet = new Set(currentBet);
             const intersection = new Set([...betSet].filter(x => resultSet.has(x)));
             isWin = intersection.size === 2;
@@ -414,7 +432,8 @@
             isWin: isWin,
             costPerChar: ticketCost,
             medalPerChar: isWin ? medalReward : 0,
-            activeCharsCount: characters.length
+            activeCharsCount: characters.length,
+            timestamp: new Date().toLocaleTimeString()
         };
 
         history.push(raceData);
@@ -439,7 +458,7 @@
         document.querySelectorAll('.monster-btn').forEach(btn => btn.classList.remove('selected'));
     }
 
-    // --- Stats & Money Logic ---
+    // --- CORE LOGIC ---
     function recalculateAll() {
         let totalSpentGlobal = 0;
         let totalMedalsGlobal = 0;
@@ -447,7 +466,7 @@
         let monsterCounts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
         let totalWinningAppearances = 0;
 
-        // Reset chars to start + manual adjustments
+        // Reset
         characters.forEach(c => {
             c.currentZeny = c.startZeny + (c.manualAdjustments || 0);
             c.medals = 0;
@@ -461,7 +480,7 @@
                 totalWinningAppearances++;
             });
 
-            const costForRound = race.costPerChar * characters.length;
+            const costForRound = race.costPerChar * characters.length; // Approximate (using current count)
             totalSpentGlobal += costForRound;
 
             characters.forEach(c => {
@@ -481,6 +500,8 @@
         document.getElementById('totalMedals').innerText = totalMedalsGlobal;
         let rate = history.length > 0 ? ((wins / history.length) * 100).toFixed(1) : 0;
         document.getElementById('winRate').innerText = `%${rate}`;
+        
+        saveData(); // Auto-save after every calculation
     }
 
     function drawPieChart(counts, total) {
@@ -518,7 +539,7 @@
         legendDiv.innerHTML = legendHTML;
     }
 
-    // --- Char Mgmt ---
+    // --- CHAR & MONEY MGMT ---
     function addCharacter() {
         const name = document.getElementById('newCharName').value;
         const zeny = parseInt(document.getElementById('newCharZeny').value);
@@ -528,7 +549,7 @@
                 id: Date.now(),
                 name: name,
                 startZeny: zeny,
-                manualAdjustments: 0, // Track added money here
+                manualAdjustments: 0,
                 currentZeny: zeny,
                 medals: 0
             });
@@ -538,15 +559,17 @@
         }
     }
 
-    function depositMoney(charId) {
+    function adjustMoney(charId, type) {
         const char = characters.find(c => c.id === charId);
         if (!char) return;
 
-        const amount = prompt(`Add Zeny to ${char.name}:`, "0");
+        const actionText = type === 'add' ? 'Add to' : 'Withdraw from';
+        const amount = prompt(`${actionText} ${char.name} (Zeny):`, "0");
         const val = parseInt(amount);
 
         if (!isNaN(val) && val > 0) {
-            char.manualAdjustments = (char.manualAdjustments || 0) + val;
+            const change = type === 'add' ? val : -val;
+            char.manualAdjustments = (char.manualAdjustments || 0) + change;
             recalculateAll();
         }
     }
@@ -562,8 +585,11 @@
             const div = document.createElement('div');
             div.className = 'char-card';
             div.innerHTML = `
-                <button class="btn-add-money" onclick="depositMoney(${c.id})" title="Add Zeny">+</button>
-                <div style="font-weight:bold; margin-bottom:5px; color:white;">${c.name}</div>
+                <div class="money-btn-group">
+                     <button class="btn-mini btn-sub" onclick="adjustMoney(${c.id}, 'sub')" title="Withdraw">-</button>
+                     <button class="btn-mini btn-add" onclick="adjustMoney(${c.id}, 'add')" title="Deposit">+</button>
+                </div>
+                <div style="font-weight:bold; margin-bottom:5px; color:white; margin-top:5px;">${c.name}</div>
                 <div class="zeny-text">${c.currentZeny.toLocaleString()} z</div>
                 <div class="medal-text">🏅 ${c.medals}</div>
             `;
