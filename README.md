@@ -25,5 +25,6 @@ If you find this project useful, consider sponsoring me on GitHub to help keep i
 | ![ANGELING](https://github.com/user-attachments/assets/4fbf4c0e-47c9-47f1-8c0c-888cd8bf19b4) **Angeling**  | **\$50 one-time**  | Holy aura, pure bounce, golden heart.                      |
 | ![GHOSTRING](https://github.com/user-attachments/assets/c72e672a-a499-4e0a-bb6b-2ec6e6756091) **Ghostring** | **\$100 one-time** | Ethereal vibes, phase-through energy, the cutest haunting. |
 | ![DEVILING](https://github.com/user-attachments/assets/aa92be65-794f-445a-9c77-08adc14e2229) **Deviling**  | **\$250 one-time** | Mischievous shadows, pink chaos, the master of cursed fun. |
-<img width="1318" height="884" alt="image" src="https://github.com/user-attachments/assets/f9c42f3f-31d3-4905-a12e-6365980607cf" />
+<img width="1383" height="894" alt="Screenshot 2026-01-09 185101" src="https://github.com/user-attachments/assets/4385b2ed-a25d-456b-9a16-b09a29f52b07" />
+
 
