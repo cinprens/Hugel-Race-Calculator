@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RO Hugel Race Manager v2</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --panel-color: #16213e;
+            --accent-color: #e94560;
+            --text-color: #e0e0e0;
+            --zeny-color: #ffd700;
+            --win-color: #4caf50;
+            --lose-color: #f44336;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2, h3 { text-align: center; margin-bottom: 10px; color: var(--text-color); }
+        
+        .main-container {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--panel-color);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #333;
+            position: relative;
+        }
+
+        .full-width { grid-column: span 2; }
+
+        input, select, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: none;
+            font-family: inherit;
+        }
+        input { background: #0f3460; color: white; border: 1px solid #533483; }
+        button { cursor: pointer; font-weight: bold; transition: 0.2s; }
+        
+        .btn-primary { background-color: var(--accent-color); color: white; }
+        .btn-primary:hover { background-color: #c72c41; }
+        .btn-undo { background-color: #ff9800; color: black; }
+        
+        /* Game Mode Toggle */
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+            background: #0f3460;
+            padding: 5px;
+            border-radius: 8px;
+        }
+        .mode-btn {
+            flex: 1;
+            background: transparent;
+            color: #888;
+            padding: 8px;
+        }
+        .mode-btn.active {
+            background: var(--accent-color);
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* Character Cards */
+        .char-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .char-card {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #533483;
+            position: relative;
+        }
+        .zeny-text { color: var(--zeny-color); font-weight: bold; }
+        .medal-text { color: #00bcd4; font-size: 0.9em; }
+        
+        /* Add Money Button */
+        .btn-add-money {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            background: #4caf50;
+            color: white;
+            font-size: 16px;
+            line-height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-add-money:hover { background: #66bb6a; }
+
+        /* Monster Selector */
+        .monster-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .monster-btn {
+            background: #2b2b40;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
+            border: 2px solid transparent;
+            transition: 0.2s;
+        }
+        .monster-btn:hover { background: #33334d; }
+        .monster-btn.selected {
+            border-color: var(--accent-color);
+            background: #3a3a55;
+        }
+        .monster-img { font-size: 2rem; margin-bottom: 5px; }
+        
+        .step-box {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--accent-color);
+            border-radius: 4px;
+        }
+
+        /* Tables & Charts */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { border-bottom: 1px solid #333; padding: 8px; text-align: left; }
+        th { color: #888; font-weight: 600; }
+        .win-row { color: var(--win-color); }
+        .lose-row { color: #888; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            text-align: center;
+        }
+        .stat-box { background: #0f3460; padding: 10px; border-radius: 5px; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; margin-top: 5px;}
+
+        .chart-wrapper {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .pie-chart {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: #333;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+        .legend-item { display: flex; align-items: center; }
+        .legend-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
+
+    </style>
+</head>
+<body>
+
+    <h1>🏰 Hugel Race Manager v2</h1>
+
+    <div class="panel full-width" style="display: flex; justify-content: space-between; align-items: center; max-width:1000px;">
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <label>Ticket (Zeny): <input type="number" id="ticketCost" value="2000" style="width:80px;"></label>
+            <label>Reward (Medals): <input type="number" id="medalReward" value="15" style="width:60px;"></label>
+        </div>
+        <button class="btn-undo" onclick="undoLast()">↩ Undo Last</button>
+    </div>
+
+    <div class="main-container">
+        
+        <div class="panel">
+            <h2>🏁 Race Panel</h2>
+            
+            <div class="mode-selector">
+                <button class="mode-btn active" id="btnSingle" onclick="setMode('single')">Single (1 Pick)</button>
+                <button class="mode-btn" id="btnDouble" onclick="setMode('double')">Double (2 Picks)</button>
+            </div>
+
+            <div class="step-box" id="step1">
+                <h3 id="step1Title">1. Pick 1 Monster</h3>
+                <div class="monster-grid" id="betGrid"></div>
+            </div>
+
+            <div class="step-box" id="step2" style="display:none; border-left-color: #4caf50;">
+                <h3>2. Result (Top 2 Winners)</h3>
+                <div class="monster-grid" id="resultGrid"></div>
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button class="btn-primary" style="flex:2;" onclick="finalizeRace()">Submit Race</button>
+                    <button style="flex:1; background:#555; color:white;" onclick="resetSelection()">Cancel</button>
+                </div>
+            </div>
+            
+            <div id="statusMsg" style="text-align:center; font-weight:bold; margin-top:10px; height:20px; color: var(--accent-color);"></div>
+        </div>
+
+        <div class="panel">
+            <h2>📊 Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div>Total Races</div>
+                    <div class="stat-val" id="totalRaces">0</div>
+                </div>
+                <div class="stat-box">
+                    <div>Win Rate</div>
+                    <div class="stat-val" id="winRate">%0</div>
+                </div>
+                <div class="stat-box">
+                    <div>Medals</div>
+                    <div class="stat-val" id="totalMedals" style="color:#00bcd4">0</div>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <h3>🏆 Winning Frequency</h3>
+                <div class="pie-chart" id="pieChart"></div>
+                <div class="chart-legend" id="chartLegend">No data...</div>
+            </div>
+
+            <hr style="border-color:#333; margin: 20px 0;">
+
+            <h3>👥 Characters</h3>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="newCharName" placeholder="Name" style="flex:2">
+                <input type="number" id="newCharZeny" placeholder="Start Zeny" style="flex:2">
+                <button class="btn-primary" style="flex:1" onclick="addCharacter()">Add</button>
+            </div>
+            <div class="char-grid" id="charList"></div>
+        </div>
+
+        <div class="panel full-width">
+            <h3>📜 History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Type</th>
+                        <th>Bet</th>
+                        <th>Result</th>
+                        <th>Status</th>
+                        <th>Cost</th>
+                        <th>Earned</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    const monsterColors = { 1: '#4fc3f7', 2: '#fff176', 3: '#a1887f', 4: '#e0e0e0', 5: '#ba68c8', 6: '#ff8a65' };
+    const monsters = [
+        { id: 1, name: "Poring", img: "💧" },
+        { id: 2, name: "Lunatic", img: "🐰" },
+        { id: 3, name: "Savage Bebe", img: "🐗" },
+        { id: 4, name: "Baby D. Wolf", img: "🐺" },
+        { id: 5, name: "Deviruchi", img: "👿" },
+        { id: 6, name: "Bapho Jr.", img: "🐐" }
+    ];
+
+    let characters = [];
+    let history = []; 
+    let currentBet = [];
+    let currentResult = [];
+    let gameMode = 'single'; // 'single' or 'double'
+
+    window.onload = function() {
+        renderMonsterGrid('betGrid', selectBet);
+        renderMonsterGrid('resultGrid', selectResult);
+        setMode('single'); // Default start
+        updateUI();
+    };
+
+    function setMode(mode) {
+        gameMode = mode;
+        resetSelection();
+        
+        // Update Buttons
+        document.getElementById('btnSingle').className = mode === 'single' ? 'mode-btn active' : 'mode-btn';
+        document.getElementById('btnDouble').className = mode === 'double' ? 'mode-btn active' : 'mode-btn';
+        
+        // Update Title
+        document.getElementById('step1Title').innerText = mode === 'single' ? '1. Pick 1 Monster' : '1. Pick 2 Monsters';
+    }
+
+    function renderMonsterGrid(elementId, clickHandler) {
+        const container = document.getElementById(elementId);
+        container.innerHTML = '';
+        monsters.forEach(m => {
+            const btn = document.createElement('button');
+            btn.className = 'monster-btn';
+            btn.style.borderBottom = `3px solid ${monsterColors[m.id]}33`; 
+            btn.innerHTML = `<span class="monster-img">${m.img}</span> <b>${m.id}</b> <span>${m.name}</span>`;
+            btn.onclick = () => clickHandler(m.id, btn);
+            btn.dataset.id = m.id;
+            container.appendChild(btn);
+        });
+    }
+
+    function selectBet(id, btn) {
+        const maxSelection = (gameMode === 'single') ? 1 : 2;
+
+        if (currentBet.includes(id)) {
+            currentBet = currentBet.filter(x => x !== id);
+            btn.classList.remove('selected');
+        } else {
+            // If Single mode, clicking a new one should replace the old one
+            if (gameMode === 'single' && currentBet.length >= 1) {
+                // Remove existing selection styling
+                const oldId = currentBet[0];
+                document.querySelector(`#betGrid button[data-id="${oldId}"]`).classList.remove('selected');
+                currentBet = [];
+            }
+            
+            if (currentBet.length < maxSelection) {
+                currentBet.push(id);
+                btn.classList.add('selected');
+            }
+        }
+
+        if (currentBet.length === maxSelection) {
+            document.getElementById('step1').style.opacity = '0.5';
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('statusMsg').innerText = `Bet on: ${currentBet.sort().join(' & ')}`;
+        } else {
+             document.getElementById('statusMsg').innerText = '';
+        }
+    }
+
+    function selectResult(id, btn) {
+        if (currentResult.includes(id)) {
+            currentResult = currentResult.filter(x => x !== id);
+            btn.classList.remove('selected');
+            return;
+        }
+        if (currentResult.length < 2) {
+            currentResult.push(id);
+            btn.classList.add('selected');
+        }
+    }
+
+    function finalizeRace() {
+        if (currentResult.length !== 2) {
+            alert("Please select the 2 winning monsters!");
+            return;
+        }
+        if (characters.length === 0) {
+             alert("Add a character first!");
+             return;
+        }
+
+        const ticketCost = parseInt(document.getElementById('ticketCost').value) || 0;
+        const medalReward = parseInt(document.getElementById('medalReward').value) || 0;
+        
+        let isWin = false;
+        const resultSet = new Set(currentResult);
+
+        if (gameMode === 'single') {
+            // Win if the selected single monster is inside the top 2 results
+            isWin = resultSet.has(currentBet[0]);
+        } else {
+            // Win if both selected monsters are the top 2
+            const betSet = new Set(currentBet);
+            const intersection = new Set([...betSet].filter(x => resultSet.has(x)));
+            isWin = intersection.size === 2;
+        }
+
+        const raceData = {
+            id: history.length + 1,
+            mode: gameMode,
+            bet: [...currentBet].sort(),
+            result: [...currentResult], 
+            isWin: isWin,
+            costPerChar: ticketCost,
+            medalPerChar: isWin ? medalReward : 0,
+            activeCharsCount: characters.length
+        };
+
+        history.push(raceData);
+        recalculateAll(); 
+        resetSelection();
+    }
+
+    function undoLast() {
+        if (history.length === 0) return;
+        if(confirm("Undo last race?")) {
+            history.pop();
+            recalculateAll();
+        }
+    }
+
+    function resetSelection() {
+        currentBet = [];
+        currentResult = [];
+        document.getElementById('step1').style.opacity = '1';
+        document.getElementById('step2').style.display = 'none';
+        document.getElementById('statusMsg').innerText = '';
+        document.querySelectorAll('.monster-btn').forEach(btn => btn.classList.remove('selected'));
+    }
+
+    // --- Stats & Money Logic ---
+    function recalculateAll() {
+        let totalSpentGlobal = 0;
+        let totalMedalsGlobal = 0;
+        let wins = 0;
+        let monsterCounts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
+        let totalWinningAppearances = 0;
+
+        // Reset chars to start + manual adjustments
+        characters.forEach(c => {
+            c.currentZeny = c.startZeny + (c.manualAdjustments || 0);
+            c.medals = 0;
+        });
+
+        history.forEach(race => {
+            if (race.isWin) wins++;
+            
+            race.result.forEach(mId => {
+                monsterCounts[mId]++;
+                totalWinningAppearances++;
+            });
+
+            const costForRound = race.costPerChar * characters.length;
+            totalSpentGlobal += costForRound;
+
+            characters.forEach(c => {
+                c.currentZeny -= race.costPerChar;
+                if (race.isWin) {
+                    c.medals += race.medalPerChar;
+                    totalMedalsGlobal += race.medalPerChar;
+                }
+            });
+        });
+
+        updateUI();
+        updateHistoryTable();
+        drawPieChart(monsterCounts, totalWinningAppearances);
+        
+        document.getElementById('totalRaces').innerText = history.length;
+        document.getElementById('totalMedals').innerText = totalMedalsGlobal;
+        let rate = history.length > 0 ? ((wins / history.length) * 100).toFixed(1) : 0;
+        document.getElementById('winRate').innerText = `%${rate}`;
+    }
+
+    function drawPieChart(counts, total) {
+        const chartDiv = document.getElementById('pieChart');
+        const legendDiv = document.getElementById('chartLegend');
+
+        if (total === 0) {
+            chartDiv.style.background = '#333';
+            legendDiv.innerHTML = 'No data.';
+            return;
+        }
+
+        let gradientString = 'conic-gradient(';
+        let currentPercent = 0;
+        let legendHTML = '';
+
+        monsters.forEach(m => {
+            const count = counts[m.id];
+            if (count > 0) {
+                const percent = (count / total) * 100;
+                const nextPercent = currentPercent + percent;
+                const color = monsterColors[m.id];
+                gradientString += `${color} ${currentPercent}% ${nextPercent}%, `;
+                currentPercent = nextPercent;
+                legendHTML += `
+                    <div class="legend-item" title="${percent.toFixed(1)}%">
+                        <div class="legend-color" style="background:${color}"></div>
+                        ${m.name} (${count})
+                    </div>`;
+            }
+        });
+
+        gradientString = gradientString.slice(0, -2) + ')';
+        chartDiv.style.background = gradientString;
+        legendDiv.innerHTML = legendHTML;
+    }
+
+    // --- Char Mgmt ---
+    function addCharacter() {
+        const name = document.getElementById('newCharName').value;
+        const zeny = parseInt(document.getElementById('newCharZeny').value);
+
+        if (name && !isNaN(zeny)) {
+            characters.push({
+                id: Date.now(),
+                name: name,
+                startZeny: zeny,
+                manualAdjustments: 0, // Track added money here
+                currentZeny: zeny,
+                medals: 0
+            });
+            document.getElementById('newCharName').value = '';
+            document.getElementById('newCharZeny').value = '';
+            recalculateAll();
+        }
+    }
+
+    function depositMoney(charId) {
+        const char = characters.find(c => c.id === charId);
+        if (!char) return;
+
+        const amount = prompt(`Add Zeny to ${char.name}:`, "0");
+        const val = parseInt(amount);
+
+        if (!isNaN(val) && val > 0) {
+            char.manualAdjustments = (char.manualAdjustments || 0) + val;
+            recalculateAll();
+        }
+    }
+
+    function updateUI() {
+        const list = document.getElementById('charList');
+        list.innerHTML = '';
+        if (characters.length === 0) {
+            list.innerHTML = '<div style="color:#888;">No characters.</div>';
+            return;
+        }
+        characters.forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'char-card';
+            div.innerHTML = `
+                <button class="btn-add-money" onclick="depositMoney(${c.id})" title="Add Zeny">+</button>
+                <div style="font-weight:bold; margin-bottom:5px; color:white;">${c.name}</div>
+                <div class="zeny-text">${c.currentZeny.toLocaleString()} z</div>
+                <div class="medal-text">🏅 ${c.medals}</div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function updateHistoryTable() {
+        const tbody = document.getElementById('historyTable');
+        tbody.innerHTML = '';
+        
+        [...history].reverse().forEach(race => {
+            const tr = document.createElement('tr');
+            tr.className = race.isWin ? 'win-row' : 'lose-row';
+            const totalCost = race.costPerChar * race.activeCharsCount;
+            const totalReward = race.isWin ? (race.medalPerChar * race.activeCharsCount) : 0;
+
+            tr.innerHTML = `
+                <td>${race.id}</td>
+                <td style="text-transform:uppercase; font-size:0.8em; font-weight:bold;">${race.mode}</td>
+                <td>${race.bet.join(' & ')}</td>
+                <td>${race.result.join(' & ')}</td>
+                <td>${race.isWin ? 'WON' : 'LOST'}</td>
+                <td>-${totalCost.toLocaleString()}</td>
+                <td>+${totalReward}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+</script>
+
+</body>
+</html>
