@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RO Hugel Manager (Item Farmer v1.1)</title>
+    <title>RO Hugel Manager (Final v1.2)</title>
     <style>
         :root {
             --bg-body: #0b1120;
             --bg-panel: #1e293b;
-            --primary: #3b82f6; /* Blue for Items */
+            --primary: #3b82f6;
             --gold: #f59e0b;
             --green: #10b981;
             --red: #ef4444;
@@ -154,10 +154,12 @@
             </div>
 
             <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
-                <span>Total Medals: <b id="val-medals" style="color:var(--gold);">0</b></span>
+                <span>Medals: <b id="val-medals" style="color:var(--gold);">0</b></span>
                 <span>Spent: <b id="val-spent" style="color:#ef4444;">0 z</b></span>
             </div>
-            <div style="text-align:center; margin-top:10px; font-size:0.8rem; color:#94a3b8;">
+            
+            <div style="text-align:center; margin-top:10px; padding-top:10px; border-top:1px solid #334155; font-size:0.85rem; color:#94a3b8;">
+                Total Races: <b id="val-races" style="color:var(--text-main);">0</b> &nbsp;|&nbsp;
                 Win Rate: <span id="val-winrate">0%</span>
             </div>
         </div>
@@ -317,7 +319,7 @@
         updateUI();
     }
 
-    /* --- THE ORACLE (ALGORITHM) --- */
+    /* --- ORACLE ALGORITHM --- */
     function askOracle() {
         if(state.history.length < 5) {
             alert("Oracle needs at least 5 rounds of history data!");
@@ -336,7 +338,7 @@
                 if(h.result.includes(m.id)) recentWins++;
             });
 
-            // Logic: Weighting Cold + Hot + Random factor
+            // Weighting
             let score = (roundsSince * 2) + (recentWins * 1.5) + (Math.random() * 3);
             return { id: m.id, name: m.name, score: score, cold: roundsSince, hot: recentWins };
         });
@@ -371,13 +373,14 @@
 
     /* --- ANALYTICS & UI --- */
     function updateUI() {
-        // Calculate Prizes
+        // Prize Calc
         const prizeCost = parseInt(document.getElementById('prizeCost').value) || 1;
         const totalPrizes = (state.stats.medals / prizeCost).toFixed(1);
         
         document.getElementById('val-prizes').innerText = totalPrizes + "x";
         document.getElementById('val-medals').innerText = state.stats.medals.toLocaleString();
         document.getElementById('val-spent').innerText = "-" + state.stats.spent.toLocaleString() + " z";
+        document.getElementById('val-races').innerText = state.history.length;
         
         const rate = state.history.length > 0 ? Math.round((state.stats.wins/state.history.length)*100) : 0;
         document.getElementById('val-winrate').innerText = rate + "%";
@@ -449,27 +452,26 @@
         state.stats.wins = wins;
     }
 
-    function hardReset() { if(confirm("Are you sure? This will delete all history.")) { localStorage.removeItem('ro_hugel_farm'); location.reload(); } }
+    function hardReset() { if(confirm("Are you sure? This will delete all history.")) { localStorage.removeItem('ro_hugel_final_v12'); location.reload(); } }
     function saveData() { 
-        // Save inputs too
         const inputs = {
             charCount: document.getElementById('charCount').value,
             ticketCost: document.getElementById('ticketCost').value,
             medalReward: document.getElementById('medalReward').value,
             prizeCost: document.getElementById('prizeCost').value
         };
-        localStorage.setItem('ro_hugel_farm_inputs', JSON.stringify(inputs));
-        localStorage.setItem('ro_hugel_farm', JSON.stringify(state)); 
+        localStorage.setItem('ro_hugel_inputs_v12', JSON.stringify(inputs));
+        localStorage.setItem('ro_hugel_data_v12', JSON.stringify(state)); 
     }
     function loadData() { 
-        const inputs = JSON.parse(localStorage.getItem('ro_hugel_farm_inputs'));
+        const inputs = JSON.parse(localStorage.getItem('ro_hugel_inputs_v12'));
         if(inputs) {
             document.getElementById('charCount').value = inputs.charCount;
             document.getElementById('ticketCost').value = inputs.ticketCost;
             document.getElementById('medalReward').value = inputs.medalReward;
             document.getElementById('prizeCost').value = inputs.prizeCost;
         }
-        const d = JSON.parse(localStorage.getItem('ro_hugel_farm')); 
+        const d = JSON.parse(localStorage.getItem('ro_hugel_data_v12')); 
         if(d) state = d; 
     }
 </script>
