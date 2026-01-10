@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>HUGEL ULTIMATE DASHBOARD v7</title>
+    <style>
+        :root { 
+            --bg: #050505; 
+            --panel: #111; 
+            --border: #333; 
+            --neon-green: #00ff9d; 
+            --neon-red: #ff0055; 
+            --neon-blue: #00ddee;
+            --text-main: #e0e0e0;
+            --text-dim: #888;
+        }
+        
+        body { background-color: var(--bg); color: var(--text-main); font-family: 'Segoe UI', 'Consolas', sans-serif; padding: 20px; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        
+        .main-wrapper { display: flex; gap: 20px; width: 100%; max-width: 1400px; align-items: flex-start; }
+        
+        /* SOL PANEL: BUTONLAR VE BARLAR */
+        .left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 400px; }
+        
+        .monster-card {
+            background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px;
+            display: flex; align-items: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+        }
+        .monster-card:hover { border-color: #666; background: #1a1a1a; transform: translateX(5px); }
+        .monster-card.critical { border: 2px solid var(--neon-red); box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.2); }
+        .monster-card.recommend { border: 1px solid var(--neon-green); box-shadow: inset 0 0 10px rgba(0, 255, 157, 0.1); }
+
+        .m-img { width: 50px; height: 50px; object-fit: contain; margin-right: 15px; border-radius: 4px; background: rgba(0,0,0,0.3); }
+        .m-details { flex: 1; }
+        .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .m-name { font-weight: bold; font-size: 1.1em; color: #fff; }
+        .m-miss { font-size: 1.6em; font-weight: 900; color: #555; }
+        .monster-card.critical .m-miss { color: var(--neon-red); animation: pulse 1s infinite; }
+        .monster-card.recommend .m-miss { color: var(--neon-green); }
+
+        /* PROGRESS BARS (YEŞİLLİ KISIM) */
+        .bar-wrapper { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-top: 5px; }
+        .bar-fill { height: 100%; transition: width 0.5s ease; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 0.75em; color: var(--text-dim); margin-top: 2px; }
+
+        /* SAĞ PANEL: TABLO VE ANALİZ */
+        .right-panel { flex: 1.5; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 500px; }
+
+        /* ORACLE BOX (ÜSTTEKİ UYARI) */
+        .oracle-alert {
+            width: 100%; max-width: 1400px; margin-bottom: 20px;
+            background: linear-gradient(90deg, #111 0%, #0a0a0a 100%);
+            border: 2px solid var(--border); border-left: 5px solid var(--text-dim);
+            padding: 20px; border-radius: 8px; text-align: center;
+        }
+        .oracle-alert.danger { border-color: var(--neon-red); border-left-color: var(--neon-red); box-shadow: 0 0 20px rgba(255,0,85,0.1); }
+        .oracle-title { font-size: 0.9em; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+        .oracle-msg { font-size: 1.8em; font-weight: bold; margin: 10px 0; color: #fff; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        
+        /* MATRİS TABLOSU */
+        h3 { border-bottom: 2px solid #333; padding-bottom: 10px; color: var(--neon-blue); font-size: 1em; text-transform: uppercase; letter-spacing: 1px; margin-top: 0; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 20px; }
+        th, td { border: 1px solid #333; padding: 8px; text-align: center; color: #aaa; }
+        th { background: #151515; color: var(--neon-blue); }
+        th img, td img { width: 20px; height: 20px; vertical-align: middle; }
+        
+        /* Tablo Renklendirme */
+        td.high-prob { background: rgba(0, 255, 157, 0.15); color: var(--neon-green); font-weight: bold; border: 1px solid var(--neon-green); }
+        td.low-prob { color: #444; }
+
+        /* LOG ŞERİDİ */
+        .history-tape { width: 100%; font-family: monospace; font-size: 0.85em; color: #666; background: #000; padding: 10px; border-radius: 4px; margin-top: 20px; overflow-x: auto; white-space: nowrap; }
+        
+        .btn-reset { background: #330000; color: #ff5555; border: 1px solid #660000; padding: 10px; cursor: pointer; width: 100%; margin-top: 10px; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="oracleBox" class="oracle-alert">
+        <div class="oracle-title">KÂHİN SİSTEMİ</div>
+        <div id="oracleText" class="oracle-msg">VERİ BEKLENİYOR...</div>
+        <div id="oracleSub" style="font-size:0.9em; color:#888;">Analiz başlatılıyor</div>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="left-panel" id="monsterList">
+            </div>
+
+        <div class="right-panel">
+            <h3>Geçiş Matrisi (Kimden Sonra Kim?)</h3>
+            <p style="font-size:0.8em; color:#666; margin-top:-10px;">Sol sütundaki kazandıktan sonra, üst satırdakinin gelme ihtimali.</p>
+            <table id="matrixTable">
+                </table>
+
+            <h3>Son 30 Yarış Geçmişi</h3>
+            <div class="history-tape" id="historyTape">...</div>
+
+            <button class="btn-reset" onclick="hardReset()">⚠️ SİSTEMİ VE HAFIZAYI SIFIRLA</button>
+        </div>
+    </div>
+
+    <script>
+        // --- AYARLAR ---
+        const monsters = [
+            { id: 1, name: "Poring", short:"POR", img: "monster/poring.gif" },
+            { id: 2, name: "Lunatic", short:"LUN", img: "monster/lunatic.gif" },
+            { id: 3, name: "Savage Baby", short:"SAV", img: "monster/savage baby.gif" },
+            { id: 4, name: "Baby D.Wolf", short:"WOLF", img: "monster/desertwolf baby.gif" },
+            { id: 5, name: "Deviruchi", short:"DEV", img: "monster/deviruchi.gif" },
+            { id: 6, name: "Baphometh Jr", short:"BAP", img: "monster/baphomethJr.gif" }
+        ];
+
+        // İdeal Oran (6 canavar olduğu için %16.66)
+        const IDEAL_RATE = 16.66;
+
+        // --- VERİ ---
+        let history = []; 
+        let winCounts = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+        let missingCounts = { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+        // Matris Verisi: [KazananID][SonrakiID] = Sayı
+        let transitionMatrix = {}; 
+
+        // Matrisi Hazırla
+        monsters.forEach(m1 => {
+            transitionMatrix[m1.id] = {};
+            monsters.forEach(m2 => transitionMatrix[m1.id][m2.id] = 0);
+        });
+
+        // --- INIT ---
+        function init() {
+            // LocalStorage varsa çek, yoksa varsayılan başlat
+            if(localStorage.getItem('hugel_v7_ultimate')) {
+                const data = JSON.parse(localStorage.getItem('hugel_v7_ultimate'));
+                history = data.history || [];
+                winCounts = data.winCounts || { 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+                // Matrisi geçmişten tekrar oluşturmak daha sağlıklı
+                rebuildMatrixFromHistory();
+            }
+            // Başlangıçta missingCounts hesapla
+            recalcMissing();
+            updateUI();
+        }
+
+        // --- CORE LOGIC ---
+        function recordWin(id) {
+            history.unshift(id);
+            if(history.length > 50) history.pop();
+
+            winCounts[id]++;
+            rebuildMatrixFromHistory();
+            recalcMissing();
+            
+            saveData();
+            updateUI();
+        }
+
+        function recalcMissing() {
+            // Herkesi geçmişte ara
+            monsters.forEach(m => {
+                const idx = history.indexOf(m.id);
+                missingCounts[m.id] = idx === -1 ? history.length : idx;
+            });
+        }
+
+        function rebuildMatrixFromHistory() {
+            // Matrisi sıfırla
+            monsters.forEach(m1 => {
+                monsters.forEach(m2 => transitionMatrix[m1.id][m2.id] = 0);
+            });
+
+            // Geçmişi tara (Tersten başla: en eskiden en yeniye)
+            // history dizisi: [0]=EnYeni, [1]=BirÖnceki...
+            for (let i = history.length - 1; i > 0; i--) {
+                const prev = history[i];     // Önceki
+                const current = history[i-1]; // Sonraki
+                if(transitionMatrix[prev] && transitionMatrix[prev][current] !== undefined) {
+                    transitionMatrix[prev][current]++;
+                }
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('hugel_v7_ultimate', JSON.stringify({ history, winCounts }));
+        }
+
+        // --- UI RENDER ---
+        function updateUI() {
+            renderLeftPanel();
+            renderMatrix();
+            renderHistoryTape();
+            runOracle();
+        }
+
+        function renderLeftPanel() {
+            const container = document.getElementById('monsterList');
+            container.innerHTML = '';
+
+            const totalRaces = history.length || 1;
+
+            monsters.forEach(m => {
+                const miss = missingCounts[m.id];
+                const wins = winCounts[m.id];
+                const rate = ((wins / totalRaces) * 100).toFixed(1);
+                
+                // Sapma Hesabı (Deviation)
+                const deviation = rate - IDEAL_RATE; // Negatifse "Az Geldi", Pozitifse "Çok Geldi"
+
+                // CSS Sınıfları
+                let classes = 'monster-card';
+                if (miss >= 9) classes += ' critical'; // 9 Tur Kuralı
+                else if (miss >= 6) classes += ' recommend';
+
+                // Bar Rengi
+                // Eğer olması gerekenden az geldiyse (Deviation < 0) -> YEŞİL
+                // Eğer çok geldiyse (Deviation > 0) -> KIRMIZI
+                let barColor = deviation < 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+                let barLabel = deviation < 0 ? '▼ AZ GELDİ (Gelmeli)' : '▲ ÇOK GELDİ (Soğumalı)';
+                
+                // Görsel bar uzunluğu (Sadece görsel, %100'ü taşmasın)
+                let visualWidth = Math.min(100, rate * 3); 
+
+                const div = document.createElement('div');
+                div.className = classes;
+                div.onclick = () => recordWin(m.id);
+                div.innerHTML = `
+                    <img src="${m.img}" class="m-img" onerror="this.src='https://via.placeholder.com/40'">
+                    <div class="m-details">
+                        <div class="m-header">
+                            <span class="m-name">${m.name}</span>
+                            <span class="m-miss">${miss}</span>
+                        </div>
+                        <div class="bar-wrapper">
+                            <div class="bar-fill" style="width:${rate}%; background:${barColor}; min-width:2%;"></div>
+                        </div>
+                        <div class="stat-row">
+                            <span>Win: %${rate}</span>
+                            <span style="color:${barColor}">${barLabel}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderMatrix() {
+            const table = document.getElementById('matrixTable');
+            let html = '<thead><tr><th>ÖNCE ↴ / SONRA ➝</th>';
+            monsters.forEach(m => html += `<th><img src="${m.img}"></th>`);
+            html += '</tr></thead><tbody>';
+
+            monsters.forEach(rowM => {
+                html += `<tr><th><img src="${rowM.img}"></th>`;
+                let rowTotal = Object.values(transitionMatrix[rowM.id]).reduce((a,b)=>a+b, 0);
+
+                monsters.forEach(colM => {
+                    const val = transitionMatrix[rowM.id][colM.id];
+                    let percent = rowTotal > 0 ? Math.round((val / rowTotal) * 100) : 0;
+                    
+                    let cellClass = '';
+                    if (percent >= 25 && rowTotal > 2) cellClass = 'high-prob';
+                    else if (val === 0) cellClass = 'low-prob';
+
+                    html += `<td class="${cellClass}">%${percent}<br><span style="font-size:0.7em">(${val})</span></td>`;
+                });
+                html += '</tr>';
+            });
+            table.innerHTML = html + '</tbody>';
+        }
+
+        function renderHistoryTape() {
+            const tape = history.slice(0, 30).map(h => {
+                const mon = monsters.find(m => m.id === h);
+                return `<span style="color:#fff; margin-right:10px;">${mon.short}</span>`;
+            }).join(' < ');
+            document.getElementById('historyTape').innerHTML = tape || "Veri yok";
+        }
+
+        // --- KÂHİN MANTIĞI ---
+        function runOracle() {
+            const box = document.getElementById('oracleBox');
+            const txt = document.getElementById('oracleText');
+            const sub = document.getElementById('oracleSub');
+
+            // 1. ÖNCELİK: 9 TUR KURALI
+            // En çok bekleyeni bul
+            let maxMiss = -1; 
+            let target = null;
+            monsters.forEach(m => {
+                if(missingCounts[m.id] > maxMiss) {
+                    maxMiss = missingCounts[m.id];
+                    target = m;
+                }
+            });
+
+            if (maxMiss >= 9) {
+                box.className = "oracle-alert danger";
+                txt.innerHTML = `HEDEF: <span style="color:var(--neon-red)">${target.name.toUpperCase()}</span>`;
+                sub.innerHTML = `KRİTİK UYARI! Tam ${maxMiss} turdur gelmiyor. İstatistiksel zorunluluk devrede.`;
+                return;
+            }
+
+            // 2. ÖNCELİK: MATRİS TAHMİNİ
+            if (history.length > 0) {
+                const lastId = history[0];
+                const lastMon = monsters.find(m => m.id === lastId);
+                
+                // Matriste en yüksek ihtimali bul
+                let bestNext = null;
+                let maxProb = -1;
+                let rowTotal = Object.values(transitionMatrix[lastId]).reduce((a,b)=>a+b,0);
+
+                monsters.forEach(m => {
+                    if (transitionMatrix[lastId][m.id] > maxProb) {
+                        maxProb = transitionMatrix[lastId][m.id];
+                        bestNext = m;
+                    }
+                });
+
+                let percent = rowTotal > 0 ? Math.round((maxProb / rowTotal) * 100) : 0;
+
+                if (rowTotal > 3 && percent >= 30) {
+                    box.className = "oracle-alert";
+                    box.style.borderColor = "var(--neon-blue)";
+                    txt.innerHTML = `ÖNERİ: <span style="color:var(--neon-blue)">${bestNext.name}</span>`;
+                    sub.innerHTML = `Matris Analizi: ${lastMon.name} kazandıktan sonra genelde %${percent} ihtimalle bu geliyor.`;
+                    return;
+                }
+            }
+
+            // 3. ÖNCELİK: STANDART
+            box.className = "oracle-alert";
+            txt.innerHTML = "DENGELİ DAĞILIM";
+            sub.innerHTML = "Kritik bir boşluk yok. Tabloyu ve yeşil barları takip et.";
+        }
+
+        function hardReset() {
+            if(confirm("Tüm veri silinecek. Emin misin?")) {
+                localStorage.removeItem('hugel_v7_ultimate');
+                location.reload();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
