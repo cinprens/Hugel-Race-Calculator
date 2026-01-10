@@ -29,4 +29,16 @@ If you find this project useful, consider sponsoring me on GitHub to help keep i
 KAHİN V2
 <img width="1599" height="880" alt="image" src="https://github.com/user-attachments/assets/92cc6cfd-2218-4a34-b4cf-b34f52280b7e" />
 
+For kahin html image file needed
 
+
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          1/9/2026  10:36 PM           4374 baphomethJr.gif
+-a----          1/9/2026  10:37 PM           3563 desertwolf baby.gif
+-a----          1/9/2026  10:37 PM           6385 deviruchi.gif
+-a----          1/9/2026  10:36 PM           3391 lunatic.gif
+-a----          1/9/2026  10:37 PM           1648 poring.gif
+-a----          1/9/2026  10:37 PM            614 savage baby.gif
