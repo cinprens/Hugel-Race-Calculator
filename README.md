@@ -26,6 +26,7 @@ If you find this project useful, consider sponsoring me on GitHub to help keep i
 | ![GHOSTRING](https://github.com/user-attachments/assets/c72e672a-a499-4e0a-bb6b-2ec6e6756091) **Ghostring** | **\$100 one-time** | Ethereal vibes, phase-through energy, the cutest haunting. |
 | ![DEVILING](https://github.com/user-attachments/assets/aa92be65-794f-445a-9c77-08adc14e2229) **Deviling**  | **\$250 one-time** | Mischievous shadows, pink chaos, the master of cursed fun. |
 <img width="1342" height="896" alt="image" src="https://github.com/user-attachments/assets/6355b636-8e97-4954-96bb-d524e677ba13" />
-
+KAHİN V2
+<img width="1599" height="880" alt="image" src="https://github.com/user-attachments/assets/92cc6cfd-2218-4a34-b4cf-b34f52280b7e" />
 
 
