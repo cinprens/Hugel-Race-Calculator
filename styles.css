@@ -19,8 +19,8 @@
             color: var(--text-main);
             margin: 0;
             padding: 20px;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow: auto;
             display: flex;
             justify-content: center;
         }
@@ -28,7 +28,7 @@
         .app-shell {
             width: 100%;
             max-width: 1700px;
-            height: 100%;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -52,8 +52,20 @@
             box-shadow: 0 0 15px rgba(83, 252, 24, 0.15);
         }
 
-        .page { display: none; height: 100%; }
-        .page.active { display: block; height: 100%; }
+        .top-actions { display: flex; align-items: center; gap: 8px; }
+        .lang-group { display: flex; gap: 6px; }
+        .lang-btn {
+            padding: 8px 10px; background: #141414; border: 1px solid #2a2a2a; color: #cfcfcf;
+            font-weight: 800; font-size: 0.7rem; cursor: pointer; border-radius: 999px;
+            text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
+        }
+        .lang-btn.active {
+            background: rgba(83, 252, 24, 0.08); border-color: var(--kick-green); color: var(--kick-green);
+            box-shadow: 0 0 10px rgba(83, 252, 24, 0.15);
+        }
+
+        .page { display: none; flex: 1; min-height: 0; }
+        .page.active { display: flex; flex-direction: column; }
 
         /* LAYOUT: LEFT (GAME) - RIGHT (INFO TOWER) */
         .layout-grid {
@@ -62,6 +74,7 @@
             gap: 25px;
             width: 100%;
             max-width: 1700px;
+            min-height: 0;
             height: 100%;
         }
 
