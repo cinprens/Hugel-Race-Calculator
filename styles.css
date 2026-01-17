@@ -52,6 +52,18 @@
             box-shadow: 0 0 15px rgba(83, 252, 24, 0.15);
         }
 
+        .top-actions { display: flex; align-items: center; gap: 8px; }
+        .lang-group { display: flex; gap: 6px; }
+        .lang-btn {
+            padding: 8px 10px; background: #141414; border: 1px solid #2a2a2a; color: #cfcfcf;
+            font-weight: 800; font-size: 0.7rem; cursor: pointer; border-radius: 999px;
+            text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
+        }
+        .lang-btn.active {
+            background: rgba(83, 252, 24, 0.08); border-color: var(--kick-green); color: var(--kick-green);
+            box-shadow: 0 0 10px rgba(83, 252, 24, 0.15);
+        }
+
         .page { display: none; flex: 1; min-height: 0; }
         .page.active { display: block; }
 
