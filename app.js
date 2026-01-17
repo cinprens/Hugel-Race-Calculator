@@ -10,10 +10,11 @@ const monsters = [
 const MONSTER_COUNT = monsters.length;
 const CONFIG_KEY = "hugel_config_v2";
 const CONFIG_DEFAULTS = {
-  analysisWindowRounds: 12,
+  entryCount: 12,
+  entryCostZeny: 2000,
   medalsPerReward: 15,
   archiveLimit: 2000,
-  rewardValue: 50
+  rewardValue: 25
 };
 
 let state = {
@@ -60,7 +61,7 @@ const translations = {
     "status.result": "Bahis: {bet} -> Sonuç: {result}",
     "panel.cash": "Kasa Durumu",
     "label.totalMedals": "TOPLAM MADALYA",
-    "label.spent": "HARCANAN",
+    "label.spent": "TOPLAM HARCAMA",
     "label.winRate": "WIN RATE",
     "label.rewardEstimate": "ÖDÜL TAHMİNİ",
     "panel.manualMedals": "Manuel Madalya",
@@ -71,10 +72,12 @@ const translations = {
     "panel.heatmap": "Kazanma Sıklığı",
     "panel.settings": "Özel Ayarlar",
     "panel.phenomenon": "🔥 Fenomenler (En Nadir Kanıtlar)",
-    "label.analysisWindow": "Analiz penceresi (son N tur)",
+    "label.entryCount": "Giriş adedi (bu tur)",
+    "label.entryCostZeny": "Giriş ücreti (Zeny / giriş)",
     "label.medalsPerReward": "1 ödül için gereken madalya",
-    "label.archiveLimit": "Arşiv limiti (kayıt)",
+    "label.archiveLimit": "Arşiv limiti (kayıt sayısı)",
     "label.rewardValue": "1 ödül değeri",
+    "label.entrySummary": "Giriş",
     "button.resetAll": "RESET",
     "panel.archiveControl": "Arşiv Kontrolü",
     "button.compute": "Hesaplamayı Başlat",
@@ -133,7 +136,7 @@ const translations = {
     "status.result": "Bet: {bet} -> Result: {result}",
     "panel.cash": "Cash Status",
     "label.totalMedals": "TOTAL MEDALS",
-    "label.spent": "SPENT",
+    "label.spent": "TOTAL SPEND",
     "label.winRate": "WIN RATE",
     "label.rewardEstimate": "REWARD ESTIMATE",
     "panel.manualMedals": "Manual Medals",
@@ -144,10 +147,12 @@ const translations = {
     "panel.heatmap": "Win Frequency",
     "panel.settings": "Advanced Settings",
     "panel.phenomenon": "🔥 Phenomena (Rarest Evidence)",
-    "label.analysisWindow": "Analysis window (last N rounds)",
+    "label.entryCount": "Entry count (this run)",
+    "label.entryCostZeny": "Entry cost (Zeny per entry)",
     "label.medalsPerReward": "Medals needed per reward",
     "label.archiveLimit": "Archive limit (entries)",
     "label.rewardValue": "Reward value",
+    "label.entrySummary": "Entry",
     "button.resetAll": "RESET",
     "panel.archiveControl": "Archive Control",
     "button.compute": "Rebuild",
@@ -240,7 +245,8 @@ function normalizeConfig(input = {}) {
     return Number.isFinite(parsed) ? parsed : fallback;
   };
   return {
-    analysisWindowRounds: Math.max(1, toInt(input.analysisWindowRounds, base.analysisWindowRounds)),
+    entryCount: Math.max(1, toInt(input.entryCount ?? input.analysisWindowRounds, base.entryCount)),
+    entryCostZeny: Math.max(0, toInt(input.entryCostZeny ?? input.ticketCost, base.entryCostZeny)),
     medalsPerReward: Math.max(1, toInt(input.medalsPerReward, base.medalsPerReward)),
     archiveLimit: Math.max(1, toInt(input.archiveLimit, base.archiveLimit)),
     rewardValue: Math.max(0, toFloat(input.rewardValue, base.rewardValue))
@@ -264,9 +270,10 @@ function loadLegacyConfig() {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
         const mapped = {
-          analysisWindowRounds: parsed.charCount,
+          entryCount: parsed.entryCount ?? parsed.analysisWindowRounds ?? parsed.charCount,
+          entryCostZeny: parsed.entryCostZeny ?? parsed.ticketCost,
           medalsPerReward: parsed.medalReward,
-          archiveLimit: parsed.ticketCost,
+          archiveLimit: parsed.archiveLimit ?? parsed.ticketCost,
           rewardValue: parsed.prizeCost
         };
         if (Object.values(mapped).some(v => v != null)) return mapped;
@@ -427,7 +434,8 @@ function toggleRes(id) {
 function renderSettingsInputs() {
   const cfg = state.config || CONFIG_DEFAULTS;
   const map = {
-    analysisWindowRounds: "analysisWindowRounds",
+    entryCount: "entryCount",
+    entryCostZeny: "entryCostZeny",
     medalsPerReward: "medalsPerReward",
     archiveLimit: "archiveLimit",
     rewardValue: "rewardValue"
@@ -1789,25 +1797,27 @@ function resetExtraMedals() {
 // ---------- STATS / PANELS ----------
 function updateStats() {
   const cfg = normalizeConfig(state.config || CONFIG_DEFAULTS);
-  const charCount = 12;
-  const ticketCost = 2000;
+  const entryCount = clampInt(cfg.entryCount, 1, 999999);
+  const entryCostZeny = clampInt(cfg.entryCostZeny, 0, 999999999);
   const medalReward = clampInt(cfg.medalsPerReward, 1, 999999);
   const prizeCost = Number.isFinite(cfg.rewardValue) ? cfg.rewardValue : CONFIG_DEFAULTS.rewardValue;
 
   const rounds = state.history.length;
   const wins = state.history.filter(r => !!r.win).length;
 
-  const spentZeny = rounds * charCount * ticketCost;
+  const spentZenyThisRun = entryCount * entryCostZeny;
+  const spentZenyTotal = rounds * entryCount * entryCostZeny;
   const earnedMedals = wins * medalReward;
   const totalMedals = earnedMedals + (state.extraMedals || 0);
   const rewardCount = medalReward > 0 ? Math.floor(totalMedals / medalReward) : 0;
   const rewardEstimate = rewardCount * prizeCost;
 
-  setText("ui-zeny", `${fmtNum(spentZeny)}z`);
+  setText("ui-zeny", `${fmtNum(spentZenyTotal)}z`);
   setText("ui-extra-medals", fmtNum(state.extraMedals || 0));
   setText("ui-medals", fmtNum(totalMedals));
   setText("ui-winrate", rounds ? `%${((wins / rounds) * 100).toFixed(1)}` : "%0.0");
   setText("ui-reward-estimate", fmtNum(rewardEstimate));
+  setText("ui-entry-summary", `${entryCount} × ${fmtNum(entryCostZeny)}z = ${fmtNum(spentZenyThisRun)}z`);
 
   renderHistory();
   renderPhenomenonPanel();

@@ -73,6 +73,10 @@ FIXLOG
                     </div>
                 </div>
                 <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.75rem; color:#9a9a9a;">
+                    <span data-i18n="label.entrySummary">Giriş</span>
+                    <b id="ui-entry-summary" style="color:#fff;">0</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.75rem; color:#9a9a9a;">
                     <span data-i18n="label.rewardEstimate">ÖDÜL TAHMİNİ</span>
                     <b id="ui-reward-estimate" style="color:#fff;">0</b>
                 </div>
@@ -105,20 +109,24 @@ FIXLOG
             <h3 data-i18n="panel.settings">Özel Ayarlar</h3>
             <div class="settings-grid">
                 <label>
-                    <span data-i18n="label.analysisWindow">Analiz penceresi (son N tur)</span>
-                    <input type="number" id="analysisWindowRounds" oninput="handleConfigInput('analysisWindowRounds', this.value)">
+                    <span data-i18n="label.entryCount">Giriş adedi (bu tur)</span>
+                    <input type="number" id="entryCount" oninput="handleConfigInput('entryCount', this.value)">
+                </label>
+                <label>
+                    <span data-i18n="label.entryCostZeny">Giriş ücreti (Zeny / giriş)</span>
+                    <input type="number" id="entryCostZeny" oninput="handleConfigInput('entryCostZeny', this.value)">
                 </label>
                 <label>
                     <span data-i18n="label.medalsPerReward">1 ödül için gereken madalya</span>
                     <input type="number" id="medalsPerReward" oninput="handleConfigInput('medalsPerReward', this.value)">
                 </label>
                 <label>
-                    <span data-i18n="label.archiveLimit">Arşiv limiti (kayıt)</span>
-                    <input type="number" id="archiveLimit" oninput="handleConfigInput('archiveLimit', this.value)">
-                </label>
-                <label>
                     <span data-i18n="label.rewardValue">1 ödül değeri</span>
                     <input type="number" id="rewardValue" oninput="handleConfigInput('rewardValue', this.value)">
+                </label>
+                <label>
+                    <span data-i18n="label.archiveLimit">Arşiv limiti (kayıt sayısı)</span>
+                    <input type="number" id="archiveLimit" oninput="handleConfigInput('archiveLimit', this.value)">
                 </label>
             </div>
             <button onclick="resetConfig()" style="width:100%; background:#222; border:none; color:#d63031; font-size:0.7rem; cursor:pointer; padding:5px;" data-i18n="button.resetAll">RESET</button>
