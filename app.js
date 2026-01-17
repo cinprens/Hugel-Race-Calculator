@@ -460,12 +460,10 @@ function formatScientific(probability) {
   return `${mantissa}×10^${expNum}`;
 }
 
-function formatOddsDenominator(odds) {
-  if (odds == null) return "-";
-  if (typeof odds === "object") {
-    return odds.num === 1 ? `1 / ${odds.den}` : `${odds.num} / ${odds.den}`;
-  }
-  return `1 / ${odds}`;
+function formatOddsDenominator(probability) {
+  if (!probability || probability <= 0) return "-";
+  const oddsIn = 1 / probability;
+  return `≈ ${oddsIn.toFixed(2)}'te 1`;
 }
 
 function resolveEventType(entry) {
@@ -481,6 +479,7 @@ function resolveEntryPhase(entry) {
 }
 
 function resolveEntryModel(entry, phase, length) {
+  if (phase === "END" || phase === "END_MISS") return "META";
   if (phase === "EXTEND" || length > 1) return "CHAIN";
   if (entry?.model) return entry.model;
   if (phase === "ROUND") return null;
@@ -492,8 +491,13 @@ function normalizeEntry(entry) {
   const eventType = resolveEventType(entry);
   let length = entry?.length || entry?.len || 1;
   let model = resolveEntryModel(entry, phase, length);
-  if (model === "BASE" || model === "CONDITIONAL") length = 1;
+  if (model === "BASE") length = 1;
+  if (length > 1) model = "CHAIN";
   if (phase === "EXTEND") model = "CHAIN";
+  if (phase === "END" || phase === "END_MISS") {
+    model = "META";
+    length = 1;
+  }
   let keys = Array.isArray(entry?.keys) ? entry.keys : [];
   if (!keys.length && typeof entry?.subjectKey === "string") {
     keys = entry.subjectKey.split("-").filter(Boolean);
@@ -514,16 +518,29 @@ function normalizeEntry(entry) {
     context = {
       ...context,
       roundType: context.mode === "PAIR" ? "PAIR" : "SINGLE",
-      slots: context.slots ?? (context.mode === "PAIR" ? 2 : 1),
+      slotsPerRound: context.slotsPerRound ?? context.slots ?? (context.mode === "PAIR" ? 2 : 1),
       targetKey: context.targetKey ?? (context.target ? Number(context.target) : null),
       note: context.note || context.mode
     };
   }
-  if (context?.roundType === "PAIR" && !context.hit && eventType === "SINGLE") {
-    context = { ...context, hit: "ANY" };
+  if (context && context.slots != null && context.slotsPerRound == null) {
+    context = { ...context, slotsPerRound: context.slots };
   }
-  if (context?.kind === "MISS" && !context.hit) {
-    context = { ...context, hit: "MISS" };
+  if (context && !context.kind) {
+    context = { ...context, kind: "HIT" };
+  }
+  if (context && eventType === "PAIR" && !context.mode) {
+    context = { ...context, mode: "PAIR_ORDERED" };
+  }
+  if (context?.hit && !context.mode) {
+    const hitToMode = { FIRST: "FIRST", SECOND: "SECOND", ANY: "ANY", MISS: "ANY" };
+    context = { ...context, mode: hitToMode[context.hit] || context.hit };
+  }
+  if (context?.roundType === "PAIR" && !context.mode && eventType === "SINGLE") {
+    context = { ...context, mode: "ANY" };
+  }
+  if (context?.kind === "MISS" && !context.mode) {
+    context = { ...context, mode: "ANY" };
   }
   const difficulty = entry?.difficulty;
   return {
@@ -545,15 +562,16 @@ function computeStepProbability(event, N) {
   const normalized = normalizeEntry(event);
   const eventType = normalized.eventType;
   const phase = normalized.phase;
-  const hit = normalized.context?.hit || "ANY";
-  if (!normalized.model || phase === "ROUND") {
+  const mode = normalized.context?.mode || "BASE";
+  const kind = normalized.context?.kind || "HIT";
+  if (!normalized.model || phase === "ROUND" || normalized.model === "META") {
     return { probability: null, odds: null };
   }
 
-  if (normalized.context?.kind === "MISS") {
+  if (kind === "MISS") {
     if (normalized.context?.roundType === "PAIR") {
       const den = safeN * safeN;
-      const num = Math.pow(safeN - 1, 2);
+      const num = mode === "FIRST" ? (safeN - 1) * safeN : Math.pow(safeN - 1, 2);
       return { probability: num / den, odds: { num, den } };
     }
     const den = safeN;
@@ -562,7 +580,7 @@ function computeStepProbability(event, N) {
   }
 
   const stepModel = normalized.model === "CHAIN"
-    ? (normalized.stepModel || (normalized.context?.roundType === "PAIR" && eventType === "SINGLE" && hit !== "FIRST" ? "CONDITIONAL" : "BASE"))
+    ? (normalized.stepModel || (normalized.context?.roundType === "PAIR" && eventType === "SINGLE" && mode !== "FIRST" ? "CONDITIONAL" : "BASE"))
     : normalized.model;
 
   if (stepModel === "BASE") {
@@ -577,7 +595,10 @@ function computeStepProbability(event, N) {
 
   if (stepModel === "CONDITIONAL") {
     if (eventType === "SINGLE") {
-      if (normalized.context?.roundType === "PAIR" && hit === "SECOND") {
+      if (normalized.context?.roundType === "PAIR" && mode === "FIRST") {
+        return { probability: 1 / safeN, odds: { num: 1, den: safeN } };
+      }
+      if (normalized.context?.roundType === "PAIR" && mode === "SECOND") {
         const den = safeN * safeN;
         const num = safeN - 1;
         return { probability: num / den, odds: { num, den } };
@@ -617,7 +638,7 @@ function computeProbability(event, N) {
 
 function buildProbabilityInfo(entry, N) {
   const normalized = normalizeEntry(entry);
-  if (normalized.phase === "START_MISS" || normalized.phase === "END_MISS") {
+  if (normalized.phase === "START_MISS" || normalized.phase === "END_MISS" || normalized.model === "META") {
     return {
       probability: null,
       odds: null,
@@ -652,7 +673,7 @@ function buildProbabilityInfo(entry, N) {
     odds,
     difficulty,
     pct: probability != null ? formatPercent(probability) : null,
-    oddsText: odds != null ? formatOddsDenominator(odds) : null,
+    oddsText: probability != null ? formatOddsDenominator(probability) : null,
     scientific: probability != null ? formatScientific(probability) : null
   };
 }
@@ -682,20 +703,24 @@ function deriveConditionalSinglesFromPair(outcomePair) {
 
 function buildProbabilityFormula(entry) {
   const normalized = normalizeEntry(entry);
-  if (!normalized.model) return null;
-  const hit = normalized.context?.hit || "ANY";
+  if (!normalized.model || normalized.model === "META") return null;
+  const mode = normalized.context?.mode || "BASE";
   const N = "N";
   let stepFormula = null;
 
   if (normalized.context?.kind === "MISS") {
-    stepFormula = normalized.context?.roundType === "PAIR"
-      ? "((N-1)/N)^2"
-      : "(N-1)/N";
+    if (normalized.context?.roundType === "PAIR" && mode === "FIRST") {
+      stepFormula = "(N-1)/N";
+    } else if (normalized.context?.roundType === "PAIR") {
+      stepFormula = "((N-1)/N)^2";
+    } else {
+      stepFormula = "(N-1)/N";
+    }
   } else if (normalized.eventType === "PAIR") {
     stepFormula = "1/(N*N)";
   } else if (normalized.context?.roundType === "PAIR") {
-    if (hit === "FIRST") stepFormula = "1/N";
-    else if (hit === "SECOND") stepFormula = "(N-1)/(N*N)";
+    if (mode === "FIRST") stepFormula = "1/N";
+    else if (mode === "SECOND") stepFormula = "(N-1)/(N*N)";
     else stepFormula = "1-((N-1)/N)^2";
   } else {
     stepFormula = "1/N";
@@ -738,11 +763,21 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     const addEntry = (phase, streakType, subjectKey, subjectNames, streakLen, extra = {}) => {
       const ts = (roundCtx && roundCtx.id) ? new Date(roundCtx.id).toISOString() : new Date().toISOString();
       const eventType = streakType === "PAIR" ? "PAIR" : "SINGLE";
-      const model = phase === "EXTEND" ? "CHAIN" : (extra.model || "BASE");
+      const model = phase.startsWith("END") ? "META" : (phase === "EXTEND" ? "CHAIN" : (extra.model || "BASE"));
       const keys = eventType === "PAIR"
         ? String(subjectKey || "").split("-").filter(Boolean)
         : [String(subjectKey || "")].filter(Boolean);
       const roundType = roundCtx?.mode === "double" ? "PAIR" : "SINGLE";
+      const baseContext = extra.context ?? (roundCtx
+        ? {
+          roundType,
+          slotsPerRound: roundType === "PAIR" ? 2 : 1,
+          targetKey: null,
+          note: eventType === "PAIR" ? "pair-ordered" : "round-context",
+          mode: eventType === "PAIR" ? "PAIR_ORDERED" : "BASE",
+          kind: "HIT"
+        }
+        : null);
       const entryBase = {
         ts,
         roundId: roundCtx?.id ?? null,
@@ -756,7 +791,7 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
         model,
         length: model === "CHAIN" ? streakLen : 1,
         keys: keys.map(key => Number(key)).filter(Number.isFinite),
-        context: extra.context ?? (roundCtx ? { roundType, slots: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-context", hit: "ANY" } : null)
+        context: baseContext
       };
       const probInfo = buildProbabilityInfo(entryBase, MONSTER_COUNT);
       target.unshift({
@@ -787,7 +822,7 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
         model: null,
         length: 1,
         keys: res.slice(),
-        context: { roundType, slots: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-outcome" },
+        context: { roundType, slotsPerRound: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-outcome", mode: "BASE", kind: "HIT" },
         probability: null,
         odds: null,
         difficulty: null
@@ -798,10 +833,11 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     const applySingleStreak = ({ prevLen, currLen, hit, model, id, name, roundType }) => {
       const context = {
         roundType,
-        slots: roundType === "PAIR" ? 2 : 1,
+        slotsPerRound: roundType === "PAIR" ? 2 : 1,
+        mode: hit,
+        kind: "HIT",
         targetKey: id,
-        note: "single-appears",
-        hit
+        note: "single-appears"
       };
       if (prevLen >= tSingle && currLen < tSingle) {
         addEntry("END", "SINGLE", String(id), [name], prevLen, { model, context });
@@ -819,7 +855,7 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
           prevLen: prev.singlesFirst?.[id] || 0,
           currLen: curr.singlesFirst?.[id] || 0,
           hit: "FIRST",
-          model: "BASE",
+          model: "CONDITIONAL",
           id,
           name: m.name,
           roundType: "PAIR"
@@ -858,11 +894,10 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     const applyMissStreak = ({ prevLen, currLen, id, name, roundType }) => {
       const context = {
         roundType,
-        slots: roundType === "PAIR" ? 2 : 1,
+        slotsPerRound: roundType === "PAIR" ? 2 : 1,
         mode: "ANY",
         kind: "MISS",
-        targetKey: id,
-        hit: "MISS"
+        targetKey: id
       };
       if (prevLen >= tSingle && currLen < tSingle) {
         addEntry("END_MISS", "SINGLE", String(id), [name], prevLen, { model: "CHAIN", context });
@@ -906,7 +941,7 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     } else if (currKey) {
       if (currLen >= tPair && prevLen < tPair) addEntry("START", "PAIR", currKey, namesFromKey(currKey), currLen);
       else if (currLen >= tPair && prevLen >= tPair && currLen > prevLen) addEntry("EXTEND", "PAIR", currKey, namesFromKey(currKey), currLen, {
-        context: { roundType: "PAIR", slots: 2, targetKey: null, note: "pair-ordered" }
+        context: { roundType: "PAIR", slotsPerRound: 2, targetKey: null, note: "pair-ordered", mode: "PAIR_ORDERED", kind: "HIT" }
       });
     }
 
@@ -1067,15 +1102,18 @@ function renderJournalItemHtml(e, idx, isActive) {
   const normalized = normalizeEntry(e);
   const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
   const typeCls = normalized.phase || "ROUND";
-  const hitCls = normalized.context?.hit === "SECOND" ? "hit-second" : "";
+  const hitCls = normalized.context?.mode === "SECOND" ? "hit-second" : "";
   const activeCls = isActive ? "active" : "";
   const title = journalTitle(normalized);
   const meta = journalMeta(normalized, probInfo);
   const formula = buildProbabilityFormula(normalized);
   const tooltip = formula ? ` title="${escapeHtml(formula)}"` : "";
   const emptyLabel = normalized.phase && String(normalized.phase).includes("MISS") ? "MISS" : "ROUND";
+  const probLabel = probInfo.probability != null && probInfo.probability < 0.001
+    ? escapeHtml(probInfo.scientific || "-")
+    : `%${escapeHtml(probInfo.pct || "-")}`;
   const probLine = probInfo.probability != null
-    ? `<div class="prob">%${escapeHtml(probInfo.pct || "-")}</div><div class="onein">${escapeHtml(probInfo.oddsText || "-")}</div>`
+    ? `<div class="prob">${probLabel}</div><div class="onein">${escapeHtml(probInfo.oddsText || "-")}</div>`
     : `<div class="prob">—</div><div class="onein">${escapeHtml(emptyLabel)}</div>`;
   const ts = formatTs(normalized.ts);
 
@@ -1133,6 +1171,13 @@ function renderJournalIcons(e) {
 function renderJournalBadges(e) {
   const normalized = normalizeEntry(e);
   const badges = [];
+  const roundType = normalized.context?.roundType;
+  const mode = normalized.context?.mode;
+  if (roundType === "SINGLE") badges.push(`<span class="journal-badge context">S</span>`);
+  if (roundType === "PAIR" && mode === "ANY") badges.push(`<span class="journal-badge context">PA</span>`);
+  if (roundType === "PAIR" && mode === "FIRST") badges.push(`<span class="journal-badge context">P1</span>`);
+  if (roundType === "PAIR" && mode === "SECOND") badges.push(`<span class="journal-badge context">P2</span>`);
+  if (roundType === "PAIR" && mode === "PAIR_ORDERED") badges.push(`<span class="journal-badge context">PO</span>`);
   if (normalized.model === "CONDITIONAL") badges.push(`<span class="journal-badge conditional">C</span>`);
   if (normalized.model === "CHAIN") badges.push(`<span class="journal-badge chain">streak</span>`);
   if (normalized.context?.kind === "MISS" || String(normalized.phase).includes("MISS")) {
@@ -1162,7 +1207,7 @@ function renderJournalDetailHtml(e) {
   const keyText = normalized.keys.length ? normalized.keys.join(",") : "-";
   const diffText = probInfo.difficulty != null ? probInfo.difficulty.toFixed(2) : "-";
   const contextText = normalized.context
-    ? `${normalized.context.roundType || "-"} slots:${normalized.context.slots ?? "-"} target:${normalized.context.targetKey ?? "-"} hit:${normalized.context.hit || "-"} ${normalized.context.note || ""}`.trim()
+    ? `${normalized.context.roundType || "-"} slots:${normalized.context.slotsPerRound ?? "-"} mode:${normalized.context.mode || "-"} kind:${normalized.context.kind || "-"} target:${normalized.context.targetKey ?? "-"} ${normalized.context.note || ""}`.trim()
     : "-";
 
   return `
@@ -1259,7 +1304,7 @@ function journalMeta(e, probInfo = null) {
   const keys = normalized.keys.length ? normalized.keys.join(",") : "-";
   const diff = probInfo?.difficulty != null ? ` • Diff: ${probInfo.difficulty.toFixed(2)}` : "";
   const ctx = normalized.context?.note
-    ? `${normalized.context.roundType || "-"}(${normalized.context.note})/${normalized.context.hit || "-"}`
+    ? `${normalized.context.roundType || "-"}(${normalized.context.note})/${normalized.context.mode || "-"}`
     : "-";
   return `Model: ${normalized.model || "-"} • Len: ${normalized.length} • Key: ${keys} • Context: ${ctx}${diff}`;
 }

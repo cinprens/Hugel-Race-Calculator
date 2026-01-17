@@ -192,6 +192,7 @@
         .journal-left { display: flex; align-items: center; gap: 8px; }
         .journal-icons { display: flex; gap: 6px; align-items: center; }
         .journal-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 999px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; border: 1px solid #2a2a2a; background: #0b0b0b; color: #cfcfcf; }
+        .journal-badge.context { border-color: #2dd4bf; color: #5eead4; }
         .journal-badge.conditional { border-color: #f59e0b; color: #facc15; }
         .journal-badge.chain { border-color: #3b82f6; color: #93c5fd; }
         .journal-badge.drought { border-color: #64748b; color: #cbd5f5; }
