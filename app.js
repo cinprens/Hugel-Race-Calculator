@@ -31,7 +31,7 @@ window.onload = () => {
     saveState();
   }
   if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
-    logJournalError("Defter oluşturulamadı: geçmiş var ama defter boş kaldı.", {
+    logJournalError("Arşiv oluşturulamadı: geçmiş var ama arşiv boş kaldı.", {
       historyCount: state.history.length
     });
   }
@@ -367,7 +367,7 @@ function rebuildJournalFromHistory() {
     state.streaks = snapshotWithCompat(prevSnap);
 
     if (history.length && !target.length) {
-      logJournalError("Defter yeniden oluşturuldu ama kayıt oluşmadı.", {
+      logJournalError("Arşiv yeniden oluşturuldu ama kayıt oluşmadı.", {
         historyCount: history.length
       });
     }
@@ -524,7 +524,7 @@ function renderJournalSummaryHtml() {
   const epic = entries.filter(e => e.prob && e.prob.oneIn >= 2000).length;
 
   return `
-    <div class="journal-detail-title">Defter Özeti</div>
+    <div class="journal-detail-title">Arşiv Özeti</div>
     <div class="journal-kv"><span>Toplam</span><b>${entries.length}</b></div>
     <div class="journal-kv"><span>START</span><b>${counts.START}</b></div>
     <div class="journal-kv"><span>EXTEND</span><b>${counts.EXTEND}</b></div>
@@ -627,7 +627,7 @@ function copyJournalJson() {
 }
 
 function clearJournal() {
-  if (!confirm("Defteri temizlemek istiyor musun?")) return;
+  if (!confirm("Arşivi temizlemek istiyor musun?")) return;
   resetJournal();
 }
 
@@ -745,7 +745,7 @@ function undo() {
 }
 
 function resetData() {
-  if (!confirm("Tüm geçmiş ve defter sıfırlansın mı?")) return;
+  if (!confirm("Tüm geçmiş ve arşiv sıfırlansın mı?")) return;
   state.bet = [];
   state.result = [];
   state.history = [];
@@ -854,8 +854,7 @@ function renderHeatmap() {
 
 function renderStreakPanel() {
   const targets = [
-    document.getElementById("streak-list-journal"),
-    document.getElementById("streak-list")
+    document.getElementById("streak-list-journal")
   ].filter(Boolean);
   if (!targets.length) return;
 
