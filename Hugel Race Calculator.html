@@ -3,7 +3,7 @@
 FIXLOG
 - SubmitRound doğrulama sıkılaştırıldı ve mod bazlı hata mesajları eklendi.
 - Raw/Double repeat anahtarları sayısal sıralama ve ayraçla güncellendi.
-- Streak defteri roundId/ts bağlamı turlardan alınacak şekilde düzeltildi.
+- Arşiv roundId/ts bağlamı turlardan alınacak şekilde düzeltildi.
 - Journal eşik varsayılanları 2/2 yapıldı, clamp min 1 korunuyor.
 - UI medals tek seferde yazılıyor; mod değişiminde sonuçlar temizleniyor.
 -->
@@ -20,7 +20,7 @@ FIXLOG
     <div class="top-bar">
         <div class="nav-group">
             <button class="nav-btn active" id="nav-main" onclick="showPage('main')">Ana Ekran</button>
-            <button class="nav-btn" id="nav-journal" onclick="showPage('journal')">Streak Defteri</button>
+            <button class="nav-btn" id="nav-journal" onclick="showPage('journal')">Arşiv</button>
         </div>
         <button class="journal-btn" onclick="undo()">Geri Al</button>
     </div>
@@ -87,27 +87,8 @@ FIXLOG
         <div id="raw-alert" class="raw-warning">ÖNEMLİ DİKKAT: UZUN SÜREDİR RAW GELMEDİ!</div>
 
         <div class="panel">
-            <h3>Seriler & İhtimaller</h3>
-            <div id="streak-list">
-                <div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>
-            </div>
-        </div>
-
-        <div class="panel">
             <h3>Kazanma Sıklığı</h3>
             <div id="heatmap-list"></div>
-        </div>
-
-        <div class="panel" style="flex-grow:1;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>Son 20 Yarış</h3>
-                <span style="font-size:0.7rem; cursor:pointer; color:var(--danger)" onclick="undo()">GERİ AL</span>
-            </div>
-            <div style="max-height:300px; overflow-y:auto;">
-                <table class="log-table">
-                    <tbody id="history-body"></tbody>
-                </table>
-            </div>
         </div>
 
         <div class="panel" style="opacity:0.4; transition:0.3s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4">
@@ -123,12 +104,13 @@ FIXLOG
 
         </div>
     </div>
+    </div>
 
     <div id="page-journal" class="page">
         <div class="layout-grid journal-page-grid">
             <div class="journal-page-left">
-                <div class="panel">
-                    <h3>Defter Kontrol</h3>
+            <div class="panel">
+                <h3>Arşiv Kontrol</h3>
                     <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
                         <button class="journal-btn" onclick="startJournalComputation()">Hesaplamayı Başlat</button>
                         <button class="journal-btn" onclick="renderJournal(true)">Listele</button>
@@ -136,20 +118,36 @@ FIXLOG
                         <input id="importHistoryFile" type="file" accept=".json,application/json" style="display:none" onchange="handleImportFile(event)">
                     </div>
                     <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px;">
-                        <button class="journal-btn" onclick="downloadJournal('csv')">Defteri İndir (CSV)</button>
-                        <button class="journal-btn" onclick="downloadJournal('json')">Defteri İndir (JSON)</button>
+                        <button class="journal-btn" onclick="downloadJournal('csv')">Arşivi İndir (CSV)</button>
+                        <button class="journal-btn" onclick="downloadJournal('json')">Arşivi İndir (JSON)</button>
                         <button class="journal-btn" onclick="copyJournalJson()">JSON Kopyala</button>
-                        <button class="journal-btn" onclick="clearJournal()">Defteri Temizle</button>
+                        <button class="journal-btn" onclick="clearJournal()">Arşivi Temizle</button>
                     </div>
                 </div>
                 <div class="panel">
-                    <h3>Uzun Kayıtlar</h3>
+                    <h3>Hata Günlüğü</h3>
+                    <div id="journal-error-list" class="journal-long-list"></div>
+                    <div id="journal-error-empty" class="journal-empty" style="display:none;">Henüz hata yok.</div>
+                </div>
+                <div class="panel">
+                    <h3>Tüm Kayıtlar</h3>
                     <div class="journal-long-meta">
                         <span>Toplam</span>
                         <b id="journal-total-count">0</b>
                     </div>
                     <div id="journal-full-list" class="journal-long-list"></div>
                     <div id="journal-full-empty" class="journal-empty" style="display:none;">Henüz kayıt yok.</div>
+                </div>
+                <div class="panel">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>Son 20 Yarış</h3>
+                        <span style="font-size:0.7rem; cursor:pointer; color:var(--danger)" onclick="undo()">GERİ AL</span>
+                    </div>
+                    <div style="max-height:300px; overflow-y:auto;">
+                        <table class="log-table">
+                            <tbody id="history-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             <div class="journal-page-right">
@@ -162,14 +160,19 @@ FIXLOG
                     <div id="journal-summary-page" class="journal-detail-card"></div>
                 </div>
                 <div class="panel">
-                    <h3>En Şanslı 3 Streak</h3>
+                    <h3>Seriler & İhtimaller</h3>
+                    <div id="streak-list-journal">
+                        <div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <h3>En Şanslı 3 Seri</h3>
                     <div id="leaderboard-list" class="leaderboard-list"></div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
+    </div>
 
     <script src="app.js" defer></script>
 </body>

@@ -52,8 +52,8 @@
             box-shadow: 0 0 15px rgba(83, 252, 24, 0.15);
         }
 
-        .page { display: none; height: 100%; }
-        .page.active { display: block; height: 100%; }
+        .page { display: none; flex: 1; min-height: 0; }
+        .page.active { display: block; }
 
         /* LAYOUT: LEFT (GAME) - RIGHT (INFO TOWER) */
         .layout-grid {
