@@ -15,25 +15,193 @@ let state = {
   history: [],
   journal: [],
   journalSelected: 0,
+  journalErrors: [],
   extraMedals: 0,
   journalSettings: { thresholdSingle: 2, thresholdPair: 2 },
   streaks: { singles: {}, pair: { key: null, len: 0 } },
   _streakSnapshot: { singles: {}, pair: { key: null, len: 0 } }
 };
 
+const translations = {
+  tr: {
+    "nav.main": "Ana Ekran",
+    "nav.archive": "Arşiv",
+    "button.undo": "Geri Al",
+    "step.bet": "1. BAHİS SEÇİMİ",
+    "step.result": "2. YARIŞ SONUCU",
+    "button.process": "VERİYİ İŞLE",
+    "status.waiting": "Bahis Bekleniyor...",
+    "status.enterResults": "Bahis: {bet} (Sonuçları gir)",
+    "status.result": "Bahis: {bet} -> Sonuç: {result}",
+    "panel.cash": "Kasa Durumu",
+    "label.totalMedals": "TOPLAM MADALYA",
+    "label.spent": "HARCANAN",
+    "label.winRate": "WIN RATE",
+    "panel.manualMedals": "Manuel Madalya",
+    "button.add": "Ekle",
+    "label.totalManual": "Toplam Manuel",
+    "button.reset": "Sıfırla",
+    "alert.raw": "ÖNEMLİ DİKKAT: UZUN SÜREDİR RAW GELMEDİ!",
+    "panel.heatmap": "Kazanma Sıklığı",
+    "panel.settings": "Özel Ayarlar",
+    "button.resetAll": "RESET",
+    "panel.archiveControl": "Arşiv Kontrol",
+    "button.compute": "Hesaplamayı Başlat",
+    "button.list": "Listele",
+    "button.importHistory": "Geçmiş Aktar (JSON)",
+    "button.downloadCsv": "Arşivi İndir (CSV)",
+    "button.downloadJson": "Arşivi İndir (JSON)",
+    "button.copyJson": "JSON Kopyala",
+    "button.clearArchive": "Arşivi Temizle",
+    "panel.errorLog": "Hata Günlüğü",
+    "text.noErrors": "Henüz hata yok.",
+    "panel.allRecords": "Tüm Kayıtlar",
+    "label.total": "Toplam",
+    "text.noRecords": "Henüz kayıt yok.",
+    "panel.last20": "Son 20 Yarış",
+    "panel.selected": "Seçili Kayıt",
+    "panel.summary": "Özet",
+    "panel.streaksProb": "Seriler & İhtimaller",
+    "text.noActiveStreak": "Aktif seri bulunamadı.",
+    "panel.top3": "En Şanslı 3 Seri",
+    "error.label": "Hata",
+    "text.noEntry": "Kayıt yok.",
+    "text.noData": "Veri yok.",
+    "text.noEnd": "Henüz END yok.",
+    "summary.title": "Arşiv Özeti",
+    "journal.round": "Tur kaydı",
+    "confirm.clearArchive": "Arşivi temizlemek istiyor musun?",
+    "confirm.resetAll": "Tüm geçmiş ve arşiv sıfırlansın mı?",
+    "error.archiveEmpty": "Arşiv oluşturulamadı: geçmiş var ama arşiv boş kaldı.",
+    "error.archiveRebuildEmpty": "Arşiv yeniden oluşturuldu ama kayıt oluşmadı.",
+    "error.importInvalid": "Import başarısız: geçerli geçmiş bulunamadı.",
+    "status.win": "WIN ✅ Tur işlendi.",
+    "status.lose": "LOSE ❌ Tur işlendi.",
+    "validation.singleBet": "Tekli mod: 1 bahis seçmelisin.",
+    "validation.doubleBet": "İkili mod: 2 bahis seçmelisin.",
+    "validation.doubleSame": "İkili mod: Bahisler aynı olamaz.",
+    "validation.resultTwo": "Sonuçta 2 kazanan seçmelisin.",
+    "validation.resultSame": "Sonuçta aynı canavar 2 kez olamaz."
+  },
+  en: {
+    "nav.main": "Main",
+    "nav.archive": "Archive",
+    "button.undo": "Undo",
+    "step.bet": "1. BET SELECTION",
+    "step.result": "2. RACE RESULT",
+    "button.process": "PROCESS DATA",
+    "status.waiting": "Waiting for bet...",
+    "status.enterResults": "Bet: {bet} (Enter results)",
+    "status.result": "Bet: {bet} -> Result: {result}",
+    "panel.cash": "Cash Status",
+    "label.totalMedals": "TOTAL MEDALS",
+    "label.spent": "SPENT",
+    "label.winRate": "WIN RATE",
+    "panel.manualMedals": "Manual Medals",
+    "button.add": "Add",
+    "label.totalManual": "Manual Total",
+    "button.reset": "Reset",
+    "alert.raw": "IMPORTANT: NO RAW FOR A LONG TIME!",
+    "panel.heatmap": "Win Frequency",
+    "panel.settings": "Advanced Settings",
+    "button.resetAll": "RESET",
+    "panel.archiveControl": "Archive Control",
+    "button.compute": "Rebuild",
+    "button.list": "List",
+    "button.importHistory": "Import History (JSON)",
+    "button.downloadCsv": "Download Archive (CSV)",
+    "button.downloadJson": "Download Archive (JSON)",
+    "button.copyJson": "Copy JSON",
+    "button.clearArchive": "Clear Archive",
+    "panel.errorLog": "Error Log",
+    "text.noErrors": "No errors yet.",
+    "panel.allRecords": "All Records",
+    "label.total": "Total",
+    "text.noRecords": "No records yet.",
+    "panel.last20": "Last 20 Races",
+    "panel.selected": "Selected Record",
+    "panel.summary": "Summary",
+    "panel.streaksProb": "Streaks & Odds",
+    "text.noActiveStreak": "No active streaks.",
+    "panel.top3": "Top 3 Luckiest Streaks",
+    "error.label": "Error",
+    "text.noEntry": "No record.",
+    "text.noData": "No data.",
+    "text.noEnd": "No END yet.",
+    "summary.title": "Archive Summary",
+    "journal.round": "Round entry",
+    "confirm.clearArchive": "Do you want to clear the archive?",
+    "confirm.resetAll": "Reset all history and archive?",
+    "error.archiveEmpty": "Archive not created: history exists but archive is empty.",
+    "error.archiveRebuildEmpty": "Archive rebuilt but no entries were produced.",
+    "error.importInvalid": "Import failed: no valid history found.",
+    "status.win": "WIN ✅ Round processed.",
+    "status.lose": "LOSE ❌ Round processed.",
+    "validation.singleBet": "Single mode: select 1 bet.",
+    "validation.doubleBet": "Double mode: select 2 bets.",
+    "validation.doubleSame": "Double mode: bets cannot be the same.",
+    "validation.resultTwo": "Select 2 winners in the result.",
+    "validation.resultSame": "Result cannot contain the same monster twice."
+  }
+};
+
+function t(key, vars = {}) {
+  const lang = state.language || "tr";
+  const dict = translations[lang] || translations.tr;
+  let value = dict[key] || translations.tr[key] || key;
+  Object.entries(vars).forEach(([k, v]) => {
+    value = value.replaceAll(`{${k}}`, v);
+  });
+  return value;
+}
+
+function applyTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    if (key) el.textContent = t(key);
+  });
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    const lang = btn.textContent.includes("TR") ? "tr" : "en";
+    btn.classList.toggle("active", state.language === lang);
+  });
+}
+
+function setLanguage(lang) {
+  state.language = lang === "en" ? "en" : "tr";
+  try { localStorage.setItem("prob_hugel_lang", state.language); } catch {}
+  applyTranslations();
+  render();
+  renderJournal();
+  updateStats();
+  renderJournalErrors();
+}
+
 const LS_KEYS = ["prob_hugel_state_v2", "prob_hugel_state", "prob_hugel_state_v1"];
 
 window.onload = () => {
   loadState();
+  try { state.language = localStorage.getItem("prob_hugel_lang") || "tr"; }
+  catch { state.language = "tr"; }
+  if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
+    rebuildJournalFromHistory();
+    saveState();
+  }
+  if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
+    logJournalError(t("error.archiveEmpty"), {
+      historyCount: state.history.length
+    });
+  }
   const hashPage =
     location.hash === "#journal" ? "journal" :
     (location.hash === "#main" ? "main" : null);
   const lastPage = hashPage || localStorage.getItem("prob_hugel_last_page") || "main";
 
   showPage(lastPage);
+  applyTranslations();
   render();
   updateStats();
   renderJournal();
+  renderJournalErrors();
 };
 
 function showPage(target) {
@@ -128,9 +296,17 @@ function render() {
   const status = document.getElementById("status-text");
   if (!status) return;
 
-  if (!state.bet.length) status.innerText = "Bahis bekleniyor.";
-  else if (state.result.length < 2) status.innerHTML = `Bahis: <b style="color:#fff">${escapeHtml(bNames)}</b> (Sonuçları gir)`;
-  else status.innerHTML = `Bahis: <b>${escapeHtml(bNames)}</b> -> Sonuç: <b style="color:var(--kick-green)">${escapeHtml(rNames)}</b>`;
+  if (!state.bet.length) status.innerText = t("status.waiting");
+  else if (state.result.length < 2) {
+    status.innerHTML = t("status.enterResults", {
+      bet: `<b style="color:#fff">${escapeHtml(bNames)}</b>`
+    });
+  } else {
+    status.innerHTML = t("status.result", {
+      bet: `<b>${escapeHtml(bNames)}</b>`,
+      result: `<b style="color:var(--kick-green)">${escapeHtml(rNames)}</b>`
+    });
+  }
 }
 
 // ---------- STREAK / PROB ----------
@@ -284,10 +460,95 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
 
   } catch (err) {
     console.error("Journal update failed:", err);
+    logJournalError("Journal update failed.", { error: String(err) });
   }
 }
 
+function logJournalError(message, details = {}) {
+  const list = Array.isArray(state.journalErrors) ? state.journalErrors : [];
+  const entry = {
+    ts: new Date().toISOString(),
+    message,
+    details
+  };
+  list.unshift(entry);
+  state.journalErrors = list.slice(0, 50);
+  saveState();
+  renderJournalErrors();
+}
 
+function renderJournalErrors() {
+  const list = document.getElementById("journal-error-list");
+  const empty = document.getElementById("journal-error-empty");
+  if (!list || !empty) return;
+
+  const entries = Array.isArray(state.journalErrors) ? state.journalErrors : [];
+  if (!entries.length) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+
+  empty.style.display = "none";
+  list.innerHTML = entries.map(e => {
+    const ts = formatTs(e.ts);
+    const detail = e.details ? JSON.stringify(e.details) : "";
+    return `
+      <div class="journal-item">
+        <div class="journal-top">
+          <div class="journal-left">
+            <div class="journal-title">${escapeHtml(t("error.label"))}</div>
+            <div class="journal-meta">${escapeHtml(e.message || "Bilinmeyen hata")}</div>
+          </div>
+        </div>
+        <div class="journal-ts">${escapeHtml(ts)}${detail ? ` • ${escapeHtml(detail)}` : ""}</div>
+      </div>`;
+  }).join("");
+}
+
+
+function rebuildJournalFromHistory() {
+  try {
+    const history = Array.isArray(state.history) ? state.history : [];
+    const target = [];
+    let prevSnap = snapshotWithCompat({ singles: {}, pair: { key: null, len: 0 } });
+    const tempHistory = [];
+    const ordered = history.slice().reverse();
+
+    ordered.forEach(round => {
+      tempHistory.unshift(round);
+      const currSnap = computeCurrentStreakState(tempHistory, monsters);
+      updateJournalFromStreakChange(prevSnap, currSnap, round, {
+        target,
+        thresholds: resolveJournalThresholds(state.journalSettings),
+        settings: state.journalSettings
+      });
+      prevSnap = snapshotWithCompat(currSnap);
+    });
+
+    state.journal = target;
+    state.journalSelected = 0;
+    state._streakSnapshot = snapshotWithCompat(prevSnap);
+    state.streaks = snapshotWithCompat(prevSnap);
+
+    if (history.length && !target.length) {
+      logJournalError(t("error.archiveRebuildEmpty"), {
+        historyCount: history.length
+      });
+    }
+  } catch (err) {
+    console.error("Journal rebuild failed:", err);
+    logJournalError("Journal rebuild failed.", { error: String(err) });
+  }
+}
+
+function startJournalComputation() {
+  rebuildJournalFromHistory();
+  saveState();
+  renderJournal(true);
+  updateStats();
+  renderJournalErrors();
+}
 
 
 
@@ -308,9 +569,9 @@ function renderJournal(forceRefresh = false) {
   if (!entries.length) {
     list.innerHTML = "";
     empty.style.display = "block";
-    if (detail) detail.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">Kayıt yok.</div>`;
+    if (detail) detail.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEntry"))}</div>`;
     if (summary) summary.innerHTML = renderJournalSummaryHtml();
-    if (leaderboard) leaderboard.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">Veri yok.</div>`;
+    if (leaderboard) leaderboard.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noData"))}</div>`;
     return;
   }
 
@@ -325,6 +586,7 @@ function renderJournal(forceRefresh = false) {
   if (detail) detail.innerHTML = renderJournalDetailHtml(entries[safeSel]);
   if (summary) summary.innerHTML = renderJournalSummaryHtml();
   if (leaderboard) leaderboard.innerHTML = renderLeaderboardHtml(entries);
+  renderJournalErrors();
 }
 
 function resetJournal() {
@@ -394,7 +656,7 @@ function renderJournalIcons(e) {
 }
 
 function renderJournalDetailHtml(e) {
-  if (!e) return `<div style="color:#444; font-size:0.8rem; text-align:center;">Kayıt yok.</div>`;
+  if (!e) return `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEntry"))}</div>`;
 
   const title = journalTitle(e);
   const meta = journalMeta(e);
@@ -427,8 +689,8 @@ function renderJournalSummaryHtml() {
   const epic = entries.filter(e => e.prob && e.prob.oneIn >= 2000).length;
 
   return `
-    <div class="journal-detail-title">Defter Özeti</div>
-    <div class="journal-kv"><span>Toplam</span><b>${entries.length}</b></div>
+    <div class="journal-detail-title">${escapeHtml(t("summary.title"))}</div>
+    <div class="journal-kv"><span>${escapeHtml(t("label.total"))}</span><b>${entries.length}</b></div>
     <div class="journal-kv"><span>START</span><b>${counts.START}</b></div>
     <div class="journal-kv"><span>EXTEND</span><b>${counts.EXTEND}</b></div>
     <div class="journal-kv"><span>END</span><b>${counts.END}</b></div>
@@ -441,7 +703,7 @@ function renderJournalSummaryHtml() {
 
 function renderLeaderboardHtml(entries) {
   const streakEnds = entries.filter(e => e.type === "END" && e.prob && e.prob.oneIn);
-  if (!streakEnds.length) return `<div style="color:#444; font-size:0.8rem; text-align:center;">Henüz END yok.</div>`;
+  if (!streakEnds.length) return `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEnd"))}</div>`;
 
   const top = streakEnds
     .slice()
@@ -483,15 +745,87 @@ function journalTitle(e) {
 }
 
 function journalMeta(e) {
-  if (e.type === "ROUND") return "Tur kaydı";
+  if (e.type === "ROUND") return t("journal.round");
   return `Len: ${e.len}${e.subjectKey ? ` • Key: ${e.subjectKey}` : ""}`;
 }
 
 // ---------- IMPORT / EXPORT ----------
+function downloadJournal(format) {
+  const entries = Array.isArray(state.journal) ? state.journal : [];
+  if (format === "json") {
+    downloadBlob(JSON.stringify({ journal: entries }, null, 2), "application/json", "hugel-journal.json");
+    return;
+  }
 
+  const header = ["ts", "roundId", "type", "streakType", "subjectKey", "subjectNames", "len", "probPct", "probOneIn"];
+  const rows = entries.map(e => [
+    e.ts || "",
+    e.roundId ?? "",
+    e.type || "",
+    e.streakType || "",
+    e.subjectKey || "",
+    Array.isArray(e.subjectNames) ? e.subjectNames.join(" + ") : "",
+    e.len ?? "",
+    e.prob?.pct ?? "",
+    e.prob?.oneIn ?? ""
+  ]);
+  const csv = [header, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
+  downloadBlob(csv, "text/csv;charset=utf-8", "hugel-journal.csv");
+}
 
+function copyJournalJson() {
+  const entries = Array.isArray(state.journal) ? state.journal : [];
+  const payload = JSON.stringify({ journal: entries }, null, 2);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(payload);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = payload;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
 
+function clearJournal() {
+  if (!confirm(t("confirm.clearArchive"))) return;
+  resetJournal();
+}
 
+function triggerImport() {
+  const input = document.getElementById("importHistoryFile");
+  if (input) input.click();
+}
+
+function handleImportFile(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result || ""));
+      const history = Array.isArray(data) ? data : (Array.isArray(data.history) ? data.history : []);
+      if (!Array.isArray(history)) {
+        logJournalError(t("error.importInvalid"), { type: typeof data });
+        return;
+      }
+      state.history = history;
+      rebuildJournalFromHistory();
+      saveState();
+      render();
+      updateStats();
+      renderJournal(true);
+    } catch (err) {
+      console.warn("Import failed:", err);
+      logJournalError("Import failed.", { error: String(err) });
+    }
+  };
+  reader.readAsText(file);
+}
 
 // ---------- MAIN LOGIC ----------
 function submitRound() {
@@ -504,14 +838,14 @@ function submitRound() {
 
   // strict validation
   if (state.mode === "single") {
-    if (state.bet.length !== 1) return fail("Tekli mod: 1 bahis seçmelisin.");
+    if (state.bet.length !== 1) return fail(t("validation.singleBet"));
   } else {
-    if (state.bet.length !== 2) return fail("İkili mod: 2 bahis seçmelisin.");
-    if (state.bet[0] === state.bet[1]) return fail("İkili mod: Bahisler aynı olamaz.");
+    if (state.bet.length !== 2) return fail(t("validation.doubleBet"));
+    if (state.bet[0] === state.bet[1]) return fail(t("validation.doubleSame"));
   }
 
-  if (state.result.length !== 2) return fail("Sonuçta 2 kazanan seçmelisin.");
-  if (state.result[0] === state.result[1]) return fail("Sonuçta aynı canavar 2 kez olamaz.");
+  if (state.result.length !== 2) return fail(t("validation.resultTwo"));
+  if (state.result[0] === state.result[1]) return fail(t("validation.resultSame"));
 
   const roundId = Date.now();
   const win = isWin(state.mode, state.bet, state.result);
@@ -544,8 +878,8 @@ function submitRound() {
   renderJournal();
 
   if (status) status.innerHTML = win
-    ? `<b style="color:var(--kick-green)">WIN ✅</b> Tur işlendi.`
-    : `<b style="color:#ff4654">LOSE ❌</b> Tur işlendi.`;
+    ? `<b style="color:var(--kick-green)">${escapeHtml(t("status.win"))}</b>`
+    : `<b style="color:#ff4654">${escapeHtml(t("status.lose"))}</b>`;
 }
 
 function isWin(mode, bet, result) {
@@ -576,18 +910,20 @@ function undo() {
 }
 
 function resetData() {
-  if (!confirm("Tüm geçmiş ve defter sıfırlansın mı?")) return;
+  if (!confirm(t("confirm.resetAll"))) return;
   state.bet = [];
   state.result = [];
   state.history = [];
   state.journal = [];
   state.journalSelected = 0;
+  state.journalErrors = [];
   state.streaks = { singles: {}, pair: { key: null, len: 0 } };
   state._streakSnapshot = { singles: {}, pair: { key: null, len: 0 } };
   saveState();
   render();
   updateStats();
   renderJournal();
+  renderJournalErrors();
 }
 
 function addExtraMedals() {
@@ -682,8 +1018,10 @@ function renderHeatmap() {
 }
 
 function renderStreakPanel() {
-  const el = document.getElementById("streak-list");
-  if (!el) return;
+  const targets = [
+    document.getElementById("streak-list-journal")
+  ].filter(Boolean);
+  if (!targets.length) return;
 
   const { tSingle, tPair } = resolveJournalThresholds();
   const curr = state.streaks || computeCurrentStreakState(state.history, monsters);
@@ -715,14 +1053,16 @@ function renderStreakPanel() {
   }
 
   if (!rows.length) {
-    el.innerHTML = `<div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>`;
+    targets.forEach(el => {
+      el.innerHTML = `<div style="text-align:center; color:#444; font-size:0.8rem;">${escapeHtml(t("text.noActiveStreak"))}</div>`;
+    });
     return;
   }
 
   // en "uçuk" olanlar üstte
   rows.sort((a, b) => (b.prob.oneIn || 0) - (a.prob.oneIn || 0));
 
-  el.innerHTML = rows.map(r => `
+  const html = rows.map(r => `
     <div style="background:#0f0f0f; border:1px solid #1f1f1f; border-radius:8px; padding:8px; margin-top:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -739,6 +1079,9 @@ function renderStreakPanel() {
       </div>
     </div>
   `).join("");
+  targets.forEach(el => {
+    el.innerHTML = html;
+  });
 }
 
 function renderRawAlert() {
@@ -768,6 +1111,7 @@ function saveState() {
       history: state.history,
       journal: state.journal,
       journalSelected: state.journalSelected,
+      journalErrors: state.journalErrors,
       extraMedals: state.extraMedals,
       journalSettings: state.journalSettings,
       streaks: state.streaks,
@@ -796,6 +1140,7 @@ function loadState() {
       state.history = Array.isArray(parsed.history) ? parsed.history : [];
       state.journal = Array.isArray(parsed.journal) ? parsed.journal : [];
       state.journalSelected = parsed.journalSelected || 0;
+      state.journalErrors = Array.isArray(parsed.journalErrors) ? parsed.journalErrors : [];
       state.extraMedals = typeof parsed.extraMedals === "number" ? parsed.extraMedals : 0;
       state.journalSettings = parsed.journalSettings || { thresholdSingle: 2, thresholdPair: 2 };
       const snap = snapshotWithCompat(parsed._streakSnapshot || parsed.streaks || { singles: {}, pair: { key: null, len: 0 } });
