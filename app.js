@@ -19,8 +19,8 @@ let state = {
   journalErrors: [],
   extraMedals: 0,
   journalSettings: { thresholdSingle: 2, thresholdPair: 2 },
-  streaks: { singles: {}, pair: { key: null, len: 0 } },
-  _streakSnapshot: { singles: {}, pair: { key: null, len: 0 } }
+  streaks: { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } },
+  _streakSnapshot: { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } }
 };
 
 const translations = {
@@ -325,6 +325,9 @@ function normalizeStreakState(input) {
   const base = input || {};
   return {
     singles: base.singles || {},
+    singlesPairAny: base.singlesPairAny || base.singles || {},
+    singlesFirst: base.singlesFirst || {},
+    singlesSecond: base.singlesSecond || {},
     pair: base.pair || { key: base.pairKey || null, len: base.pairLen || 0 }
   };
 }
@@ -332,26 +335,58 @@ function normalizeStreakState(input) {
 function snapshotWithCompat(curr) {
   return {
     singles: curr.singles || {},
+    singlesPairAny: curr.singlesPairAny || {},
+    singlesFirst: curr.singlesFirst || {},
+    singlesSecond: curr.singlesSecond || {},
     pair: curr.pair || { key: null, len: 0 }
   };
 }
 
 function computeCurrentStreakState(history, monstersList) {
   const singles = {};
+  const singlesPairAny = {};
+  const singlesFirst = {};
+  const singlesSecond = {};
   monstersList.forEach(m => {
-    let s = 0;
+    const id = m.id;
+    let sAny = 0;
+    let sPairAny = 0;
+    let sFirst = 0;
+    let sSecond = 0;
     for (let i = 0; i < history.length; i++) {
-      const res = Array.isArray(history[i]?.result) ? history[i].result : [];
-      if (res.includes(m.id)) s++;
+      const round = history[i];
+      const res = Array.isArray(round?.result) ? round.result : [];
+      if (res.includes(id)) sAny++;
       else break;
     }
-    singles[m.id] = s;
+    for (let i = 0; i < history.length; i++) {
+      const round = history[i];
+      const res = Array.isArray(round?.result) ? round.result : [];
+      if (round?.mode === "double" && res.includes(id)) sPairAny++;
+      else break;
+    }
+    for (let i = 0; i < history.length; i++) {
+      const round = history[i];
+      const res = Array.isArray(round?.result) ? round.result : [];
+      if (round?.mode === "double" && res[0] === id) sFirst++;
+      else break;
+    }
+    for (let i = 0; i < history.length; i++) {
+      const round = history[i];
+      const res = Array.isArray(round?.result) ? round.result : [];
+      if (round?.mode === "double" && res[1] === id && res[0] !== id) sSecond++;
+      else break;
+    }
+    singles[id] = sAny;
+    singlesPairAny[id] = sPairAny;
+    singlesFirst[id] = sFirst;
+    singlesSecond[id] = sSecond;
   });
 
   let pairKey = null;
   let pairLen = 0;
   if (history.length && Array.isArray(history[0]?.result)) {
-    const getKey = (h) => (Array.isArray(h?.result) ? h.result : []).slice().sort((a, b) => a - b).join("-");
+    const getKey = (h) => (Array.isArray(h?.result) ? h.result : []).slice(0, 2).join("-");
     pairKey = getKey(history[0]) || null;
     if (pairKey) {
       for (let i = 0; i < history.length; i++) {
@@ -361,7 +396,7 @@ function computeCurrentStreakState(history, monstersList) {
     }
   }
 
-  return { singles, pair: { key: pairKey, len: pairLen } };
+  return { singles, singlesPairAny, singlesFirst, singlesSecond, pair: { key: pairKey, len: pairLen } };
 }
 
 function formatPercent(probability) {
@@ -436,6 +471,9 @@ function normalizeEntry(entry) {
       note: context.note || context.mode
     };
   }
+  if (context?.roundType === "PAIR" && !context.hit && eventType === "SINGLE") {
+    context = { ...context, hit: "ANY" };
+  }
   const difficulty = entry?.difficulty;
   return {
     ...entry,
@@ -456,12 +494,13 @@ function computeStepProbability(event, N) {
   const normalized = normalizeEntry(event);
   const eventType = normalized.eventType;
   const phase = normalized.phase;
+  const hit = normalized.context?.hit || "ANY";
   if (!normalized.model || phase === "ROUND") {
     return { probability: null, odds: null };
   }
 
   const stepModel = normalized.model === "CHAIN"
-    ? (normalized.stepModel || (normalized.context?.roundType === "PAIR" && eventType === "SINGLE" ? "CONDITIONAL" : "BASE"))
+    ? (normalized.stepModel || (normalized.context?.roundType === "PAIR" && eventType === "SINGLE" && hit !== "FIRST" ? "CONDITIONAL" : "BASE"))
     : normalized.model;
 
   if (stepModel === "BASE") {
@@ -476,6 +515,11 @@ function computeStepProbability(event, N) {
 
   if (stepModel === "CONDITIONAL") {
     if (eventType === "SINGLE") {
+      if (normalized.context?.roundType === "PAIR" && hit === "SECOND") {
+        const den = safeN * safeN;
+        const num = safeN - 1;
+        return { probability: num / den, odds: { num, den } };
+      }
       const den = safeN * safeN;
       const num = (2 * safeN - 1);
       return { probability: num / den, odds: { num, den } };
@@ -558,9 +602,33 @@ function deriveConditionalSinglesFromPair(outcomePair) {
       roundType: "PAIR",
       slots: 2,
       targetKey: Number(key),
-      note: "single-appears"
+      note: "single-appears",
+      hit: "ANY"
     }
   }));
+}
+
+function buildProbabilityFormula(entry) {
+  const normalized = normalizeEntry(entry);
+  if (!normalized.model) return null;
+  const hit = normalized.context?.hit || "ANY";
+  const N = "N";
+  let stepFormula = null;
+
+  if (normalized.eventType === "PAIR") {
+    stepFormula = "1/(N*N)";
+  } else if (normalized.context?.roundType === "PAIR") {
+    if (hit === "FIRST") stepFormula = "1/N";
+    else if (hit === "SECOND") stepFormula = "(N-1)/(N*N)";
+    else stepFormula = "1-((N-1)/N)^2";
+  } else {
+    stepFormula = "1/N";
+  }
+
+  if (normalized.model === "CHAIN") {
+    return `(${stepFormula})^${normalized.length}`;
+  }
+  return stepFormula;
 }
 
 function getMonsterById(id) {
@@ -612,7 +680,7 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
         model,
         length: model === "CHAIN" ? streakLen : 1,
         keys: keys.map(key => Number(key)).filter(Number.isFinite),
-        context: extra.context ?? (roundCtx ? { roundType, slots: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-context" } : null)
+        context: extra.context ?? (roundCtx ? { roundType, slots: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-context", hit: "ANY" } : null)
       };
       const probInfo = buildProbabilityInfo(entryBase, MONSTER_COUNT);
       target.unshift({
@@ -651,34 +719,62 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     };
 
     // SINGLE streak changes (her monster için)
+    const applySingleStreak = ({ prevLen, currLen, hit, model, id, name, roundType }) => {
+      const context = {
+        roundType,
+        slots: roundType === "PAIR" ? 2 : 1,
+        targetKey: id,
+        note: "single-appears",
+        hit
+      };
+      if (prevLen >= tSingle && currLen < tSingle) {
+        addEntry("END", "SINGLE", String(id), [name], prevLen, { model, context });
+      } else if (currLen >= tSingle && prevLen < tSingle) {
+        addEntry("START", "SINGLE", String(id), [name], currLen, { model, context });
+      } else if (currLen >= tSingle && prevLen >= tSingle && currLen > prevLen) {
+        addEntry("EXTEND", "SINGLE", String(id), [name], currLen, { model, context });
+      }
+    };
+
     monsters.forEach(m => {
       const id = m.id;
-      const prevLen = prev.singles?.[id] || 0;
-      const currLen = curr.singles?.[id] || 0;
-
-      if (prevLen >= tSingle && currLen < tSingle) {
-        const conditional = roundCtx?.mode === "double"
-          ? deriveConditionalSinglesFromPair(roundCtx?.result || [])
-          : [];
-        const ctxEntry = conditional.find(c => c.keys?.[0] === id);
-        addEntry("END", "SINGLE", String(id), [m.name], prevLen, {
-          model: roundCtx?.mode === "double" ? "CONDITIONAL" : "BASE",
-          context: roundCtx?.mode === "double" ? ctxEntry?.context : null
+      if (roundCtx?.mode === "double") {
+        applySingleStreak({
+          prevLen: prev.singlesFirst?.[id] || 0,
+          currLen: curr.singlesFirst?.[id] || 0,
+          hit: "FIRST",
+          model: "BASE",
+          id,
+          name: m.name,
+          roundType: "PAIR"
         });
-      } else if (currLen >= tSingle && prevLen < tSingle) {
-        const conditional = roundCtx?.mode === "double"
-          ? deriveConditionalSinglesFromPair(roundCtx?.result || [])
-          : [];
-        const ctxEntry = conditional.find(c => c.keys?.[0] === id);
-        addEntry("START", "SINGLE", String(id), [m.name], currLen, {
-          model: roundCtx?.mode === "double" ? "CONDITIONAL" : "BASE",
-          context: roundCtx?.mode === "double" ? ctxEntry?.context : null
+        applySingleStreak({
+          prevLen: prev.singlesSecond?.[id] || 0,
+          currLen: curr.singlesSecond?.[id] || 0,
+          hit: "SECOND",
+          model: "CONDITIONAL",
+          id,
+          name: m.name,
+          roundType: "PAIR"
         });
-      } else if (currLen >= tSingle && prevLen >= tSingle && currLen > prevLen) {
-        addEntry("EXTEND", "SINGLE", String(id), [m.name], currLen, {
-          context: roundCtx?.mode === "double"
-            ? { roundType: "PAIR", slots: 2, targetKey: id, note: "single-appears" }
-            : { roundType: "SINGLE", slots: 1, targetKey: id, note: "single-appears" }
+        applySingleStreak({
+          prevLen: prev.singlesPairAny?.[id] || 0,
+          currLen: curr.singlesPairAny?.[id] || 0,
+          hit: "ANY",
+          model: "CONDITIONAL",
+          id,
+          name: m.name,
+          roundType: "PAIR"
+        });
+      } else {
+        applySingleStreak({
+          prevLen: prev.singles?.[id] || 0,
+          currLen: curr.singles?.[id] || 0,
+          hit: "ANY",
+          model: "BASE",
+          id,
+          name: m.name,
+          roundType: "SINGLE"
         });
       }
     });
@@ -848,16 +944,19 @@ function renderJournalItemHtml(e, idx, isActive) {
   const normalized = normalizeEntry(e);
   const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
   const typeCls = normalized.phase || "ROUND";
+  const hitCls = normalized.context?.hit === "SECOND" ? "hit-second" : "";
   const activeCls = isActive ? "active" : "";
   const title = journalTitle(normalized);
   const meta = journalMeta(normalized, probInfo);
+  const formula = buildProbabilityFormula(normalized);
+  const tooltip = formula ? ` title="${escapeHtml(formula)}"` : "";
   const probLine = probInfo.probability != null
     ? `<div class="prob">%${escapeHtml(probInfo.pct || "-")}</div><div class="onein">${escapeHtml(probInfo.oddsText || "-")}</div>`
     : `<div class="prob">—</div><div class="onein">ROUND</div>`;
   const ts = formatTs(normalized.ts);
 
   return `
-  <div class="journal-item ${escapeHtml(typeCls)} ${activeCls}" onclick="selectJournalEntry(${idx})">
+  <div class="journal-item ${escapeHtml(typeCls)} ${escapeHtml(hitCls)} ${activeCls}" onclick="selectJournalEntry(${idx})">
     <div class="journal-top">
       <div class="journal-left">
         <div class="journal-icons">${renderJournalIcons(normalized)}${renderJournalBadges(normalized)}</div>
@@ -866,7 +965,7 @@ function renderJournalItemHtml(e, idx, isActive) {
           <div class="journal-meta">${escapeHtml(meta)}</div>
         </div>
       </div>
-      <div class="journal-right">${probLine}</div>
+      <div class="journal-right"${tooltip}>${probLine}</div>
     </div>
     <div class="journal-ts">${escapeHtml(ts)}${normalized.roundId ? ` • #${escapeHtml(String(normalized.roundId))}` : ""}</div>
   </div>`;
@@ -936,7 +1035,7 @@ function renderJournalDetailHtml(e) {
   const keyText = normalized.keys.length ? normalized.keys.join(",") : "-";
   const diffText = probInfo.difficulty != null ? probInfo.difficulty.toFixed(2) : "-";
   const contextText = normalized.context
-    ? `${normalized.context.roundType || "-"} slots:${normalized.context.slots ?? "-"} target:${normalized.context.targetKey ?? "-"} ${normalized.context.note || ""}`.trim()
+    ? `${normalized.context.roundType || "-"} slots:${normalized.context.slots ?? "-"} target:${normalized.context.targetKey ?? "-"} hit:${normalized.context.hit || "-"} ${normalized.context.note || ""}`.trim()
     : "-";
 
   return `
@@ -1019,10 +1118,12 @@ function journalTitle(e) {
      normalized.phase === "EXTEND" ? "EXTEND" :
      normalized.phase === "END" ? "END" : "LOG");
 
+  const hitLabel = normalized.context?.hit ? ` (${normalized.context.hit})` : "";
+  const eventLabel = `${normalized.eventType || "?"}${hitLabel}`;
   const subj = (Array.isArray(normalized.subjectNames) && normalized.subjectNames.length)
     ? normalized.subjectNames.join(" + ")
     : (normalized.keys.length ? normalized.keys.join(" + ") : "—");
-  return `${base} • ${normalized.eventType || "?"} • ${subj}`;
+  return `${base} • ${eventLabel} • ${subj}`;
 }
 
 function journalMeta(e, probInfo = null) {
@@ -1031,7 +1132,7 @@ function journalMeta(e, probInfo = null) {
   const keys = normalized.keys.length ? normalized.keys.join(",") : "-";
   const diff = probInfo?.difficulty != null ? ` • Diff: ${probInfo.difficulty.toFixed(2)}` : "";
   const ctx = normalized.context?.note
-    ? `${normalized.context.roundType || "-"}(${normalized.context.note})`
+    ? `${normalized.context.roundType || "-"}(${normalized.context.note})/${normalized.context.hit || "-"}`
     : "-";
   return `Model: ${normalized.model || "-"} • Len: ${normalized.length} • Key: ${keys} • Context: ${ctx}${diff}`;
 }
@@ -1194,8 +1295,8 @@ function undo() {
   state.history.shift();
   state.journal = [];
   state.journalSelected = 0;
-  state.streaks = { singles: {}, pair: { key: null, len: 0 } };
-  state._streakSnapshot = { singles: {}, pair: { key: null, len: 0 } };
+  state.streaks = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
+  state._streakSnapshot = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
   saveState();
   render();
   updateStats();
@@ -1210,8 +1311,8 @@ function resetData() {
   state.journal = [];
   state.journalSelected = 0;
   state.journalErrors = [];
-  state.streaks = { singles: {}, pair: { key: null, len: 0 } };
-  state._streakSnapshot = { singles: {}, pair: { key: null, len: 0 } };
+  state.streaks = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
+  state._streakSnapshot = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
   saveState();
   render();
   updateStats();
@@ -1488,7 +1589,7 @@ function loadState() {
       state.journalErrors = Array.isArray(parsed.journalErrors) ? parsed.journalErrors : [];
       state.extraMedals = typeof parsed.extraMedals === "number" ? parsed.extraMedals : 0;
       state.journalSettings = parsed.journalSettings || { thresholdSingle: 2, thresholdPair: 2 };
-      const snap = snapshotWithCompat(parsed._streakSnapshot || parsed.streaks || { singles: {}, pair: { key: null, len: 0 } });
+      const snap = snapshotWithCompat(parsed._streakSnapshot || parsed.streaks || { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } });
       state._streakSnapshot = snap;
       state.streaks = snap;
     }
