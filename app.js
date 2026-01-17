@@ -7,6 +7,7 @@ const monsters = [
   { id: 5, name: "Devi",    url: "https://static.divine-pride.net/images/mobs/png/1109.png" },
   { id: 6, name: "Bapho",   url: "https://static.divine-pride.net/images/mobs/png/1101.png" } // Bapho Jr yerine benzer ikon
 ];
+const MONSTER_COUNT = monsters.length;
 
 let state = {
   mode: "single",
@@ -376,12 +377,12 @@ function formatScientific(probability) {
   return `${mantissa}×10^${expNum}`;
 }
 
-function formatOddsDenominator(oddsDenominator) {
-  if (oddsDenominator == null) return "-";
-  if (typeof oddsDenominator === "object") {
-    return `${oddsDenominator.num} / ${oddsDenominator.den}`;
+function formatOddsDenominator(odds) {
+  if (odds == null) return "-";
+  if (typeof odds === "object") {
+    return odds.num === 1 ? `1 / ${odds.den}` : `${odds.num} / ${odds.den}`;
   }
-  return `1 / ${oddsDenominator}`;
+  return `1 / ${odds}`;
 }
 
 function resolveEventType(entry) {
@@ -392,17 +393,24 @@ function resolveEventType(entry) {
   return "SINGLE";
 }
 
-function resolveEntryModel(entry) {
-  if (entry?.type === "EXTEND") return "CHAIN";
+function resolveEntryPhase(entry) {
+  return entry?.phase || entry?.type || "ROUND";
+}
+
+function resolveEntryModel(entry, phase, length) {
+  if (phase === "EXTEND" || length > 1) return "CHAIN";
   if (entry?.model) return entry.model;
-  if (entry?.type === "ROUND") return null;
+  if (phase === "ROUND") return null;
   return "BASE";
 }
 
 function normalizeEntry(entry) {
+  const phase = resolveEntryPhase(entry);
   const eventType = resolveEventType(entry);
-  const model = resolveEntryModel(entry);
-  const length = entry?.length || entry?.len || 1;
+  let length = entry?.length || entry?.len || 1;
+  let model = resolveEntryModel(entry, phase, length);
+  if (model === "BASE" || model === "CONDITIONAL") length = 1;
+  if (phase === "EXTEND") model = "CHAIN";
   let keys = Array.isArray(entry?.keys) ? entry.keys : [];
   if (!keys.length && typeof entry?.subjectKey === "string") {
     keys = entry.subjectKey.split("-").filter(Boolean);
@@ -410,83 +418,112 @@ function normalizeEntry(entry) {
   if (!keys.length && eventType === "SINGLE" && entry?.subjectKey) {
     keys = [String(entry.subjectKey)];
   }
+  keys = keys.map(key => Number(key)).filter(Number.isFinite);
   const probability = entry?.probability;
-  const oddsDenominator = entry?.oddsDenominator;
+  let odds = entry?.odds;
+  if (!odds && entry?.oddsDenominator) {
+    odds = typeof entry.oddsDenominator === "object"
+      ? entry.oddsDenominator
+      : { num: 1, den: entry.oddsDenominator };
+  }
+  let context = entry?.context ?? null;
+  if (context?.mode && !context.roundType) {
+    context = {
+      ...context,
+      roundType: context.mode === "PAIR" ? "PAIR" : "SINGLE",
+      slots: context.slots ?? (context.mode === "PAIR" ? 2 : 1),
+      targetKey: context.targetKey ?? (context.target ? Number(context.target) : null),
+      note: context.note || context.mode
+    };
+  }
   const difficulty = entry?.difficulty;
   return {
     ...entry,
+    phase,
     eventType,
     model,
     length,
     keys,
-    context: entry?.context ?? null,
+    context,
     probability,
-    oddsDenominator,
+    odds,
     difficulty
   };
 }
 
-function computeProbability(event, N) {
+function computeStepProbability(event, N) {
   const safeN = Math.max(1, Number(N) || 1);
   const normalized = normalizeEntry(event);
   const eventType = normalized.eventType;
-  const model = normalized.model;
-  const length = Math.max(1, Number(normalized.length) || 1);
-  let probability = null;
-  let oddsDenominator = null;
-
-  if (!model || normalized.type === "ROUND") {
-    return { probability: null, oddsDenominator: null, difficulty: null };
+  const phase = normalized.phase;
+  if (!normalized.model || phase === "ROUND") {
+    return { probability: null, odds: null };
   }
 
-  if (model === "BASE") {
+  const stepModel = normalized.model === "CHAIN"
+    ? (normalized.stepModel || (normalized.context?.roundType === "PAIR" && eventType === "SINGLE" ? "CONDITIONAL" : "BASE"))
+    : normalized.model;
+
+  if (stepModel === "BASE") {
     if (eventType === "SINGLE") {
-      probability = 1 / safeN;
-      oddsDenominator = safeN;
-    } else if (eventType === "PAIR") {
-      probability = 1 / (safeN * safeN);
-      oddsDenominator = safeN * safeN;
+      return { probability: 1 / safeN, odds: { num: 1, den: safeN } };
     }
-  } else if (model === "CONDITIONAL") {
+    if (eventType === "PAIR") {
+      const den = safeN * safeN;
+      return { probability: 1 / den, odds: { num: 1, den } };
+    }
+  }
+
+  if (stepModel === "CONDITIONAL") {
     if (eventType === "SINGLE") {
       const den = safeN * safeN;
       const num = (2 * safeN - 1);
-      probability = num / den;
-      oddsDenominator = { num, den };
-    } else if (eventType === "PAIR") {
-      probability = 1 / (safeN * safeN);
-      oddsDenominator = safeN * safeN;
+      return { probability: num / den, odds: { num, den } };
     }
-  } else if (model === "CHAIN") {
-    if (eventType === "SINGLE") {
-      probability = Math.pow(1 / safeN, length);
-      oddsDenominator = Math.pow(safeN, length);
-    } else if (eventType === "PAIR") {
-      const base = safeN * safeN;
-      probability = Math.pow(1 / base, length);
-      oddsDenominator = Math.pow(base, length);
+    if (eventType === "PAIR") {
+      const den = safeN * safeN;
+      return { probability: 1 / den, odds: { num: 1, den } };
     }
   }
 
+  return { probability: null, odds: null };
+}
+
+function computeProbability(event, N) {
+  const normalized = normalizeEntry(event);
+  const length = Math.max(1, Number(normalized.length) || 1);
+  const step = computeStepProbability(normalized, N);
+  if (step.probability == null) {
+    return { probability: null, odds: null, difficulty: null };
+  }
+  const probability = normalized.model === "CHAIN"
+    ? Math.pow(step.probability, length)
+    : step.probability;
+  const odds = step.odds
+    ? {
+      num: Math.pow(step.odds.num, normalized.model === "CHAIN" ? length : 1),
+      den: Math.pow(step.odds.den, normalized.model === "CHAIN" ? length : 1)
+    }
+    : null;
   const difficulty = probability ? -Math.log10(probability) : null;
-  return { probability, oddsDenominator, difficulty };
+  return { probability, odds, difficulty };
 }
 
 function buildProbabilityInfo(entry, N) {
   const normalized = normalizeEntry(entry);
   let probability = normalized.probability;
-  let oddsDenominator = normalized.oddsDenominator;
+  let odds = normalized.odds;
   let difficulty = normalized.difficulty;
 
   if (probability == null && normalized.prob?.oneIn) {
     probability = 1 / normalized.prob.oneIn;
-    oddsDenominator = normalized.prob.oneIn;
+    odds = { num: 1, den: normalized.prob.oneIn };
   }
 
   if (probability == null && normalized.model) {
     const computed = computeProbability(normalized, N);
     probability = computed.probability;
-    oddsDenominator = computed.oddsDenominator;
+    odds = computed.odds;
     difficulty = computed.difficulty;
   }
 
@@ -496,10 +533,10 @@ function buildProbabilityInfo(entry, N) {
 
   return {
     probability,
-    oddsDenominator,
+    odds,
     difficulty,
     pct: probability != null ? formatPercent(probability) : null,
-    oddsText: oddsDenominator != null ? formatOddsDenominator(oddsDenominator) : null,
+    oddsText: odds != null ? formatOddsDenominator(odds) : null,
     scientific: probability != null ? formatScientific(probability) : null
   };
 }
@@ -509,18 +546,20 @@ function getOddsSortValue(probInfo) {
   return 1 / probInfo.probability;
 }
 
-function deriveConditionalSinglesFromPair(outcomePair, N) {
+function deriveConditionalSinglesFromPair(outcomePair) {
   const ids = Array.isArray(outcomePair) ? outcomePair.filter(Boolean) : [];
-  const unique = Array.from(new Set(ids)).map(id => String(id));
+  const unique = Array.from(new Set(ids));
   return unique.map(key => ({
-    key,
+    eventType: "SINGLE",
+    model: "CONDITIONAL",
+    length: 1,
+    keys: [Number(key)],
     context: {
-      mode: "PAIR",
-      targetKey: key,
-      slots: "PAIR_SLOT",
-      outcome: ids.map(id => String(id))
-    },
-    probability: computeProbability({ eventType: "SINGLE", model: "CONDITIONAL", length: 1 }, N).probability
+      roundType: "PAIR",
+      slots: 2,
+      targetKey: Number(key),
+      note: "single-appears"
+    }
   }));
 }
 
@@ -552,32 +591,34 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     const { tSingle, tPair } = thresholds;
     if (!Array.isArray(target)) return;
 
-    const addEntry = (type, streakType, subjectKey, subjectNames, len, extra = {}) => {
+    const addEntry = (phase, streakType, subjectKey, subjectNames, streakLen, extra = {}) => {
       const ts = (roundCtx && roundCtx.id) ? new Date(roundCtx.id).toISOString() : new Date().toISOString();
       const eventType = streakType === "PAIR" ? "PAIR" : "SINGLE";
-      const model = type === "EXTEND" ? "CHAIN" : (extra.model || "BASE");
+      const model = phase === "EXTEND" ? "CHAIN" : (extra.model || "BASE");
       const keys = eventType === "PAIR"
         ? String(subjectKey || "").split("-").filter(Boolean)
         : [String(subjectKey || "")].filter(Boolean);
+      const roundType = roundCtx?.mode === "double" ? "PAIR" : "SINGLE";
       const entryBase = {
         ts,
         roundId: roundCtx?.id ?? null,
-        type,
+        phase,
+        type: phase,
         streakType,
         subjectKey,
         subjectNames,
-        len,
+        len: streakLen,
         eventType,
         model,
-        length: len,
-        keys,
-        context: extra.context ?? null
+        length: model === "CHAIN" ? streakLen : 1,
+        keys: keys.map(key => Number(key)).filter(Number.isFinite),
+        context: extra.context ?? (roundCtx ? { roundType, slots: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-context" } : null)
       };
-      const probInfo = buildProbabilityInfo(entryBase, monsters.length);
+      const probInfo = buildProbabilityInfo(entryBase, MONSTER_COUNT);
       target.unshift({
         ...entryBase,
         probability: probInfo.probability,
-        oddsDenominator: probInfo.oddsDenominator,
+        odds: probInfo.odds,
         difficulty: probInfo.difficulty
       });
     };
@@ -586,11 +627,13 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
       if (!roundCtx?.id) return;
       const ts = new Date(roundCtx.id).toISOString();
       const streakType = roundCtx.mode === "double" ? "PAIR" : "SINGLE";
+      const roundType = roundCtx.mode === "double" ? "PAIR" : "SINGLE";
       const res = Array.isArray(roundCtx.result) ? roundCtx.result : [];
       const subjectNames = res.map(i => (getMonsterById(i) || {}).name).filter(Boolean);
       target.unshift({
         ts,
         roundId: roundCtx.id,
+        phase: "ROUND",
         type: "ROUND",
         streakType,
         subjectKey: null,
@@ -599,10 +642,10 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
         eventType: streakType,
         model: null,
         length: 1,
-        keys: [],
-        context: null,
+        keys: res.slice(),
+        context: { roundType, slots: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-outcome" },
         probability: null,
-        oddsDenominator: null,
+        odds: null,
         difficulty: null
       });
     };
@@ -615,38 +658,28 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
 
       if (prevLen >= tSingle && currLen < tSingle) {
         const conditional = roundCtx?.mode === "double"
-          ? deriveConditionalSinglesFromPair(roundCtx?.result || [], monsters.length)
+          ? deriveConditionalSinglesFromPair(roundCtx?.result || [])
           : [];
-        const ctxEntry = conditional.find(c => c.key === String(id));
+        const ctxEntry = conditional.find(c => c.keys?.[0] === id);
         addEntry("END", "SINGLE", String(id), [m.name], prevLen, {
           model: roundCtx?.mode === "double" ? "CONDITIONAL" : "BASE",
-          context: roundCtx?.mode === "double"
-            ? (ctxEntry?.context || {
-              mode: "PAIR",
-              targetKey: String(id),
-              slots: "PAIR_SLOT",
-              outcome: (roundCtx?.result || []).map(x => String(x))
-            })
-            : null
+          context: roundCtx?.mode === "double" ? ctxEntry?.context : null
         });
       } else if (currLen >= tSingle && prevLen < tSingle) {
         const conditional = roundCtx?.mode === "double"
-          ? deriveConditionalSinglesFromPair(roundCtx?.result || [], monsters.length)
+          ? deriveConditionalSinglesFromPair(roundCtx?.result || [])
           : [];
-        const ctxEntry = conditional.find(c => c.key === String(id));
+        const ctxEntry = conditional.find(c => c.keys?.[0] === id);
         addEntry("START", "SINGLE", String(id), [m.name], currLen, {
           model: roundCtx?.mode === "double" ? "CONDITIONAL" : "BASE",
-          context: roundCtx?.mode === "double"
-            ? (ctxEntry?.context || {
-              mode: "PAIR",
-              targetKey: String(id),
-              slots: "PAIR_SLOT",
-              outcome: (roundCtx?.result || []).map(x => String(x))
-            })
-            : null
+          context: roundCtx?.mode === "double" ? ctxEntry?.context : null
         });
       } else if (currLen >= tSingle && prevLen >= tSingle && currLen > prevLen) {
-        addEntry("EXTEND", "SINGLE", String(id), [m.name], currLen);
+        addEntry("EXTEND", "SINGLE", String(id), [m.name], currLen, {
+          context: roundCtx?.mode === "double"
+            ? { roundType: "PAIR", slots: 2, targetKey: id, note: "single-appears" }
+            : { roundType: "SINGLE", slots: 1, targetKey: id, note: "single-appears" }
+        });
       }
     });
 
@@ -661,7 +694,9 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
       if (currKey && currLen >= tPair && prevKey !== currKey) addEntry("START", "PAIR", currKey, namesFromKey(currKey), currLen);
     } else if (currKey) {
       if (currLen >= tPair && prevLen < tPair) addEntry("START", "PAIR", currKey, namesFromKey(currKey), currLen);
-      else if (currLen >= tPair && prevLen >= tPair && currLen > prevLen) addEntry("EXTEND", "PAIR", currKey, namesFromKey(currKey), currLen);
+      else if (currLen >= tPair && prevLen >= tPair && currLen > prevLen) addEntry("EXTEND", "PAIR", currKey, namesFromKey(currKey), currLen, {
+        context: { roundType: "PAIR", slots: 2, targetKey: null, note: "pair-ordered" }
+      });
     }
 
     // Her tur için (isteğe bağlı) ROUND kaydı: son kayıt aynı roundId değilse ekle
@@ -811,8 +846,8 @@ function resetJournal() {
 
 function renderJournalItemHtml(e, idx, isActive) {
   const normalized = normalizeEntry(e);
-  const probInfo = buildProbabilityInfo(normalized, monsters.length);
-  const typeCls = normalized.type || "ROUND";
+  const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
+  const typeCls = normalized.phase || "ROUND";
   const activeCls = isActive ? "active" : "";
   const title = journalTitle(normalized);
   const meta = journalMeta(normalized, probInfo);
@@ -873,9 +908,10 @@ function renderJournalIcons(e) {
 }
 
 function renderJournalBadges(e) {
+  const normalized = normalizeEntry(e);
   const badges = [];
-  if (e.model === "CONDITIONAL") badges.push(`<span class="journal-badge conditional">C</span>`);
-  if (e.model === "CHAIN") badges.push(`<span class="journal-badge chain">streak</span>`);
+  if (normalized.model === "CONDITIONAL") badges.push(`<span class="journal-badge conditional">C</span>`);
+  if (normalized.model === "CHAIN") badges.push(`<span class="journal-badge chain">streak</span>`);
   return badges.length ? badges.join("") : "";
 }
 
@@ -883,14 +919,14 @@ function renderJournalDetailHtml(e) {
   if (!e) return `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEntry"))}</div>`;
 
   const normalized = normalizeEntry(e);
-  const probInfo = buildProbabilityInfo(normalized, monsters.length);
+  const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
   const title = journalTitle(normalized);
   const meta = journalMeta(normalized, probInfo);
   const ts = formatTs(normalized.ts);
   const prob = probInfo.probability != null ? `%${probInfo.pct} (${probInfo.oddsText})` : "-";
   const sci = probInfo.scientific ? probInfo.scientific : "-";
   const pills = [
-    `<span class="journal-pill">${escapeHtml(t("label.type"))}: <b>${escapeHtml(normalized.type)}</b></span>`,
+    `<span class="journal-pill">${escapeHtml(t("label.type"))}: <b>${escapeHtml(normalized.phase)}</b></span>`,
     `<span class="journal-pill">Event: <b>${escapeHtml(normalized.eventType || "-")}</b></span>`,
     normalized.model ? `<span class="journal-pill">Model: <b>${escapeHtml(normalized.model)}</b></span>` : "",
     normalized.length ? `<span class="journal-pill">${escapeHtml(t("label.len"))}: <b>${escapeHtml(String(normalized.length))}</b></span>` : ""
@@ -899,6 +935,9 @@ function renderJournalDetailHtml(e) {
   const subj = Array.isArray(normalized.subjectNames) && normalized.subjectNames.length ? normalized.subjectNames.join(" + ") : "-";
   const keyText = normalized.keys.length ? normalized.keys.join(",") : "-";
   const diffText = probInfo.difficulty != null ? probInfo.difficulty.toFixed(2) : "-";
+  const contextText = normalized.context
+    ? `${normalized.context.roundType || "-"} slots:${normalized.context.slots ?? "-"} target:${normalized.context.targetKey ?? "-"} ${normalized.context.note || ""}`.trim()
+    : "-";
 
   return `
     <div class="journal-detail-title">${escapeHtml(title)}</div>
@@ -906,6 +945,7 @@ function renderJournalDetailHtml(e) {
     <div>${pills}</div>
     <div class="journal-kv"><span>Konu</span><b>${escapeHtml(subj)}</b></div>
     <div class="journal-kv"><span>Key</span><b>${escapeHtml(keyText)}</b></div>
+    <div class="journal-kv"><span>Context</span><b>${escapeHtml(contextText)}</b></div>
     <div class="journal-kv"><span>Meta</span><b>${escapeHtml(meta)}</b></div>
     <div class="journal-kv"><span>İhtimal</span><b>${escapeHtml(prob)}</b></div>
     <div class="journal-kv"><span>Scientific</span><b>${escapeHtml(sci)}</b></div>
@@ -916,10 +956,13 @@ function renderJournalDetailHtml(e) {
 function renderJournalSummaryHtml() {
   const entries = Array.isArray(state.journal) ? state.journal : [];
   const counts = { START: 0, EXTEND: 0, END: 0, ROUND: 0 };
-  entries.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
+  entries.forEach(e => {
+    const phase = normalizeEntry(e).phase;
+    counts[phase] = (counts[phase] || 0) + 1;
+  });
 
-  const rare = entries.filter(e => getOddsSortValue(buildProbabilityInfo(e, monsters.length)) >= 500).length;
-  const epic = entries.filter(e => getOddsSortValue(buildProbabilityInfo(e, monsters.length)) >= 2000).length;
+  const rare = entries.filter(e => getOddsSortValue(buildProbabilityInfo(e, MONSTER_COUNT)) >= 500).length;
+  const epic = entries.filter(e => getOddsSortValue(buildProbabilityInfo(e, MONSTER_COUNT)) >= 2000).length;
 
   return `
     <div class="journal-detail-title">${escapeHtml(t("summary.title"))}</div>
@@ -935,12 +978,12 @@ function renderJournalSummaryHtml() {
 }
 
 function renderLeaderboardHtml(entries) {
-  const streakEnds = entries.filter(e => e.type === "END" && buildProbabilityInfo(e, monsters.length).probability != null);
+  const streakEnds = entries.filter(e => normalizeEntry(e).phase === "END" && buildProbabilityInfo(e, MONSTER_COUNT).probability != null);
   if (!streakEnds.length) return `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEnd"))}</div>`;
 
   const top = streakEnds
     .slice()
-    .sort((a, b) => getOddsSortValue(buildProbabilityInfo(b, monsters.length)) - getOddsSortValue(buildProbabilityInfo(a, monsters.length)))
+    .sort((a, b) => getOddsSortValue(buildProbabilityInfo(b, MONSTER_COUNT)) - getOddsSortValue(buildProbabilityInfo(a, MONSTER_COUNT)))
     .slice(0, 3);
 
   const medals = ["🥇", "🥈", "🥉"];
@@ -948,7 +991,7 @@ function renderLeaderboardHtml(entries) {
 
   return top.map((e, i) => {
     const normalized = normalizeEntry(e);
-    const probInfo = buildProbabilityInfo(normalized, monsters.length);
+    const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
     const title = journalTitle(normalized);
     const meta = `${normalized.eventType} • ${t("label.len")} ${normalized.length}`;
     const medal = medals[i] || "🏅";
@@ -971,10 +1014,10 @@ function renderLeaderboardHtml(entries) {
 function journalTitle(e) {
   const normalized = normalizeEntry(e);
   const base =
-    normalized.type === "ROUND" ? "ROUND" :
-    (normalized.type === "START" ? "START" :
-     normalized.type === "EXTEND" ? "EXTEND" :
-     normalized.type === "END" ? "END" : "LOG");
+    normalized.phase === "ROUND" ? "ROUND" :
+    (normalized.phase === "START" ? "START" :
+     normalized.phase === "EXTEND" ? "EXTEND" :
+     normalized.phase === "END" ? "END" : "LOG");
 
   const subj = (Array.isArray(normalized.subjectNames) && normalized.subjectNames.length)
     ? normalized.subjectNames.join(" + ")
@@ -984,10 +1027,13 @@ function journalTitle(e) {
 
 function journalMeta(e, probInfo = null) {
   const normalized = normalizeEntry(e);
-  if (normalized.type === "ROUND") return t("journal.round");
+  if (normalized.phase === "ROUND") return t("journal.round");
   const keys = normalized.keys.length ? normalized.keys.join(",") : "-";
   const diff = probInfo?.difficulty != null ? ` • Diff: ${probInfo.difficulty.toFixed(2)}` : "";
-  return `Model: ${normalized.model || "-"} • Len: ${normalized.length} • Key: ${keys}${diff}`;
+  const ctx = normalized.context?.note
+    ? `${normalized.context.roundType || "-"}(${normalized.context.note})`
+    : "-";
+  return `Model: ${normalized.model || "-"} • Len: ${normalized.length} • Key: ${keys} • Context: ${ctx}${diff}`;
 }
 
 // ---------- IMPORT / EXPORT ----------
@@ -998,21 +1044,21 @@ function downloadJournal(format) {
     return;
   }
 
-  const header = ["ts", "roundId", "phase", "eventType", "model", "length", "keys", "context", "probability", "oddsDenominator", "difficulty"];
+  const header = ["ts", "roundId", "phase", "eventType", "model", "length", "keys", "context", "probability", "odds", "difficulty"];
   const rows = entries.map(e => {
     const normalized = normalizeEntry(e);
-    const probInfo = buildProbabilityInfo(normalized, monsters.length);
+    const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
     return [
       normalized.ts || "",
       normalized.roundId ?? "",
-      normalized.type || "",
+      normalized.phase || "",
       normalized.eventType || "",
       normalized.model || "",
       normalized.length ?? "",
       normalized.keys.length ? normalized.keys.join("+") : "",
       normalized.context ? JSON.stringify(normalized.context) : "",
       probInfo.probability ?? "",
-      probInfo.oddsDenominator ? JSON.stringify(probInfo.oddsDenominator) : "",
+      probInfo.odds ? JSON.stringify(probInfo.odds) : "",
       probInfo.difficulty ?? ""
     ];
   });
@@ -1274,12 +1320,13 @@ function getActiveStreakRows() {
     const len = curr.singles[m.id] || 0;
     if (len >= tSingle) {
       const p = buildProbabilityInfo({
-        type: "EXTEND",
+        phase: "EXTEND",
         eventType: "SINGLE",
         model: "CHAIN",
         length: len,
-        keys: [String(m.id)]
-      }, monsters.length);
+        keys: [m.id],
+        context: { roundType: "SINGLE", slots: 1, targetKey: m.id, note: "single-appears" }
+      }, MONSTER_COUNT);
       rows.push({
         title: `${m.name} (SINGLE)`,
         len,
@@ -1292,12 +1339,13 @@ function getActiveStreakRows() {
   if (curr.pair?.key && (curr.pair.len || 0) >= tPair) {
     const len = curr.pair.len || 0;
     const p = buildProbabilityInfo({
-      type: "EXTEND",
+      phase: "EXTEND",
       eventType: "PAIR",
       model: "CHAIN",
       length: len,
-      keys: curr.pair.key.split("-").filter(Boolean)
-    }, monsters.length);
+      keys: curr.pair.key.split("-").filter(Boolean).map(Number),
+      context: { roundType: "PAIR", slots: 2, targetKey: null, note: "pair-ordered" }
+    }, MONSTER_COUNT);
     rows.push({
       title: `${namesFromKey(curr.pair.key).join(" + ")} (PAIR)`,
       len,
