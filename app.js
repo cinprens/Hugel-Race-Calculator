@@ -19,8 +19,24 @@ let state = {
   journalErrors: [],
   extraMedals: 0,
   journalSettings: { thresholdSingle: 2, thresholdPair: 2 },
-  streaks: { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } },
-  _streakSnapshot: { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } }
+  streaks: {
+    singles: {},
+    singlesPairAny: {},
+    singlesFirst: {},
+    singlesSecond: {},
+    missesSingle: {},
+    missesPairAny: {},
+    pair: { key: null, len: 0 }
+  },
+  _streakSnapshot: {
+    singles: {},
+    singlesPairAny: {},
+    singlesFirst: {},
+    singlesSecond: {},
+    missesSingle: {},
+    missesPairAny: {},
+    pair: { key: null, len: 0 }
+  }
 };
 
 const translations = {
@@ -328,6 +344,8 @@ function normalizeStreakState(input) {
     singlesPairAny: base.singlesPairAny || base.singles || {},
     singlesFirst: base.singlesFirst || {},
     singlesSecond: base.singlesSecond || {},
+    missesSingle: base.missesSingle || {},
+    missesPairAny: base.missesPairAny || {},
     pair: base.pair || { key: base.pairKey || null, len: base.pairLen || 0 }
   };
 }
@@ -338,6 +356,8 @@ function snapshotWithCompat(curr) {
     singlesPairAny: curr.singlesPairAny || {},
     singlesFirst: curr.singlesFirst || {},
     singlesSecond: curr.singlesSecond || {},
+    missesSingle: curr.missesSingle || {},
+    missesPairAny: curr.missesPairAny || {},
     pair: curr.pair || { key: null, len: 0 }
   };
 }
@@ -347,12 +367,16 @@ function computeCurrentStreakState(history, monstersList) {
   const singlesPairAny = {};
   const singlesFirst = {};
   const singlesSecond = {};
+  const missesSingle = {};
+  const missesPairAny = {};
   monstersList.forEach(m => {
     const id = m.id;
     let sAny = 0;
     let sPairAny = 0;
     let sFirst = 0;
     let sSecond = 0;
+    let missSingle = 0;
+    let missPairAny = 0;
     for (let i = 0; i < history.length; i++) {
       const round = history[i];
       const res = Array.isArray(round?.result) ? round.result : [];
@@ -377,10 +401,26 @@ function computeCurrentStreakState(history, monstersList) {
       if (round?.mode === "double" && res[1] === id && res[0] !== id) sSecond++;
       else break;
     }
+    for (let i = 0; i < history.length; i++) {
+      const round = history[i];
+      const res = Array.isArray(round?.result) ? round.result : [];
+      if (round?.mode !== "single") continue;
+      if (res[0] !== id) missSingle++;
+      else break;
+    }
+    for (let i = 0; i < history.length; i++) {
+      const round = history[i];
+      const res = Array.isArray(round?.result) ? round.result : [];
+      if (round?.mode !== "double") continue;
+      if (!res.includes(id)) missPairAny++;
+      else break;
+    }
     singles[id] = sAny;
     singlesPairAny[id] = sPairAny;
     singlesFirst[id] = sFirst;
     singlesSecond[id] = sSecond;
+    missesSingle[id] = missSingle;
+    missesPairAny[id] = missPairAny;
   });
 
   let pairKey = null;
@@ -396,7 +436,15 @@ function computeCurrentStreakState(history, monstersList) {
     }
   }
 
-  return { singles, singlesPairAny, singlesFirst, singlesSecond, pair: { key: pairKey, len: pairLen } };
+  return {
+    singles,
+    singlesPairAny,
+    singlesFirst,
+    singlesSecond,
+    missesSingle,
+    missesPairAny,
+    pair: { key: pairKey, len: pairLen }
+  };
 }
 
 function formatPercent(probability) {
@@ -474,6 +522,9 @@ function normalizeEntry(entry) {
   if (context?.roundType === "PAIR" && !context.hit && eventType === "SINGLE") {
     context = { ...context, hit: "ANY" };
   }
+  if (context?.kind === "MISS" && !context.hit) {
+    context = { ...context, hit: "MISS" };
+  }
   const difficulty = entry?.difficulty;
   return {
     ...entry,
@@ -497,6 +548,17 @@ function computeStepProbability(event, N) {
   const hit = normalized.context?.hit || "ANY";
   if (!normalized.model || phase === "ROUND") {
     return { probability: null, odds: null };
+  }
+
+  if (normalized.context?.kind === "MISS") {
+    if (normalized.context?.roundType === "PAIR") {
+      const den = safeN * safeN;
+      const num = Math.pow(safeN - 1, 2);
+      return { probability: num / den, odds: { num, den } };
+    }
+    const den = safeN;
+    const num = safeN - 1;
+    return { probability: num / den, odds: { num, den } };
   }
 
   const stepModel = normalized.model === "CHAIN"
@@ -555,6 +617,16 @@ function computeProbability(event, N) {
 
 function buildProbabilityInfo(entry, N) {
   const normalized = normalizeEntry(entry);
+  if (normalized.phase === "START_MISS" || normalized.phase === "END_MISS") {
+    return {
+      probability: null,
+      odds: null,
+      difficulty: null,
+      pct: null,
+      oddsText: null,
+      scientific: null
+    };
+  }
   let probability = normalized.probability;
   let odds = normalized.odds;
   let difficulty = normalized.difficulty;
@@ -615,7 +687,11 @@ function buildProbabilityFormula(entry) {
   const N = "N";
   let stepFormula = null;
 
-  if (normalized.eventType === "PAIR") {
+  if (normalized.context?.kind === "MISS") {
+    stepFormula = normalized.context?.roundType === "PAIR"
+      ? "((N-1)/N)^2"
+      : "(N-1)/N";
+  } else if (normalized.eventType === "PAIR") {
     stepFormula = "1/(N*N)";
   } else if (normalized.context?.roundType === "PAIR") {
     if (hit === "FIRST") stepFormula = "1/N";
@@ -779,6 +855,45 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
       }
     });
 
+    const applyMissStreak = ({ prevLen, currLen, id, name, roundType }) => {
+      const context = {
+        roundType,
+        slots: roundType === "PAIR" ? 2 : 1,
+        mode: "ANY",
+        kind: "MISS",
+        targetKey: id,
+        hit: "MISS"
+      };
+      if (prevLen >= tSingle && currLen < tSingle) {
+        addEntry("END_MISS", "SINGLE", String(id), [name], prevLen, { model: "CHAIN", context });
+      } else if (currLen >= tSingle && prevLen < tSingle) {
+        addEntry("START_MISS", "SINGLE", String(id), [name], currLen, { model: "CHAIN", context });
+      } else if (currLen >= tSingle && prevLen >= tSingle && currLen > prevLen) {
+        addEntry("EXTEND_MISS", "SINGLE", String(id), [name], currLen, { model: "CHAIN", context });
+      }
+    };
+
+    monsters.forEach(m => {
+      const id = m.id;
+      if (roundCtx?.mode === "double") {
+        applyMissStreak({
+          prevLen: prev.missesPairAny?.[id] || 0,
+          currLen: curr.missesPairAny?.[id] || 0,
+          id,
+          name: m.name,
+          roundType: "PAIR"
+        });
+      } else {
+        applyMissStreak({
+          prevLen: prev.missesSingle?.[id] || 0,
+          currLen: curr.missesSingle?.[id] || 0,
+          id,
+          name: m.name,
+          roundType: "SINGLE"
+        });
+      }
+    });
+
     // PAIR streak changes
     const prevKey = prev.pair?.key || null;
     const prevLen = prev.pair?.len || 0;
@@ -854,7 +969,15 @@ function rebuildJournalFromHistory() {
   try {
     const history = Array.isArray(state.history) ? state.history : [];
     const target = [];
-    let prevSnap = snapshotWithCompat({ singles: {}, pair: { key: null, len: 0 } });
+    let prevSnap = snapshotWithCompat({
+      singles: {},
+      singlesPairAny: {},
+      singlesFirst: {},
+      singlesSecond: {},
+      missesSingle: {},
+      missesPairAny: {},
+      pair: { key: null, len: 0 }
+    });
     const tempHistory = [];
     const ordered = history.slice().reverse();
 
@@ -950,9 +1073,10 @@ function renderJournalItemHtml(e, idx, isActive) {
   const meta = journalMeta(normalized, probInfo);
   const formula = buildProbabilityFormula(normalized);
   const tooltip = formula ? ` title="${escapeHtml(formula)}"` : "";
+  const emptyLabel = normalized.phase && String(normalized.phase).includes("MISS") ? "MISS" : "ROUND";
   const probLine = probInfo.probability != null
     ? `<div class="prob">%${escapeHtml(probInfo.pct || "-")}</div><div class="onein">${escapeHtml(probInfo.oddsText || "-")}</div>`
-    : `<div class="prob">—</div><div class="onein">ROUND</div>`;
+    : `<div class="prob">—</div><div class="onein">${escapeHtml(emptyLabel)}</div>`;
   const ts = formatTs(normalized.ts);
 
   return `
@@ -1011,6 +1135,9 @@ function renderJournalBadges(e) {
   const badges = [];
   if (normalized.model === "CONDITIONAL") badges.push(`<span class="journal-badge conditional">C</span>`);
   if (normalized.model === "CHAIN") badges.push(`<span class="journal-badge chain">streak</span>`);
+  if (normalized.context?.kind === "MISS" || String(normalized.phase).includes("MISS")) {
+    badges.push(`<span class="journal-badge drought">DROUGHT</span>`);
+  }
   return badges.length ? badges.join("") : "";
 }
 
@@ -1054,7 +1181,7 @@ function renderJournalDetailHtml(e) {
 
 function renderJournalSummaryHtml() {
   const entries = Array.isArray(state.journal) ? state.journal : [];
-  const counts = { START: 0, EXTEND: 0, END: 0, ROUND: 0 };
+  const counts = { START: 0, EXTEND: 0, END: 0, ROUND: 0, START_MISS: 0, EXTEND_MISS: 0, END_MISS: 0 };
   entries.forEach(e => {
     const phase = normalizeEntry(e).phase;
     counts[phase] = (counts[phase] || 0) + 1;
@@ -1295,8 +1422,24 @@ function undo() {
   state.history.shift();
   state.journal = [];
   state.journalSelected = 0;
-  state.streaks = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
-  state._streakSnapshot = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
+  state.streaks = {
+    singles: {},
+    singlesPairAny: {},
+    singlesFirst: {},
+    singlesSecond: {},
+    missesSingle: {},
+    missesPairAny: {},
+    pair: { key: null, len: 0 }
+  };
+  state._streakSnapshot = {
+    singles: {},
+    singlesPairAny: {},
+    singlesFirst: {},
+    singlesSecond: {},
+    missesSingle: {},
+    missesPairAny: {},
+    pair: { key: null, len: 0 }
+  };
   saveState();
   render();
   updateStats();
@@ -1311,8 +1454,24 @@ function resetData() {
   state.journal = [];
   state.journalSelected = 0;
   state.journalErrors = [];
-  state.streaks = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
-  state._streakSnapshot = { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } };
+  state.streaks = {
+    singles: {},
+    singlesPairAny: {},
+    singlesFirst: {},
+    singlesSecond: {},
+    missesSingle: {},
+    missesPairAny: {},
+    pair: { key: null, len: 0 }
+  };
+  state._streakSnapshot = {
+    singles: {},
+    singlesPairAny: {},
+    singlesFirst: {},
+    singlesSecond: {},
+    missesSingle: {},
+    missesPairAny: {},
+    pair: { key: null, len: 0 }
+  };
   saveState();
   render();
   updateStats();
@@ -1589,7 +1748,15 @@ function loadState() {
       state.journalErrors = Array.isArray(parsed.journalErrors) ? parsed.journalErrors : [];
       state.extraMedals = typeof parsed.extraMedals === "number" ? parsed.extraMedals : 0;
       state.journalSettings = parsed.journalSettings || { thresholdSingle: 2, thresholdPair: 2 };
-      const snap = snapshotWithCompat(parsed._streakSnapshot || parsed.streaks || { singles: {}, singlesPairAny: {}, singlesFirst: {}, singlesSecond: {}, pair: { key: null, len: 0 } });
+      const snap = snapshotWithCompat(parsed._streakSnapshot || parsed.streaks || {
+        singles: {},
+        singlesPairAny: {},
+        singlesFirst: {},
+        singlesSecond: {},
+        missesSingle: {},
+        missesPairAny: {},
+        pair: { key: null, len: 0 }
+      });
       state._streakSnapshot = snap;
       state.streaks = snap;
     }
