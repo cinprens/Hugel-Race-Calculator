@@ -66,7 +66,7 @@ const translations = {
     "panel.summary": "Özet",
     "panel.streaksProb": "Seriler & İhtimaller",
     "text.noActiveStreak": "Aktif seri bulunamadı.",
-    "panel.topProb": "En Yüksek 3 Olasılık",
+    "panel.topProb": "En Düşük 3 Olasılık",
     "panel.top3": "En Şanslı 3 Seri",
     "error.label": "Hata",
     "text.noEntry": "Kayıt yok.",
@@ -131,7 +131,7 @@ const translations = {
     "panel.summary": "Summary",
     "panel.streaksProb": "Streaks & Odds",
     "text.noActiveStreak": "No active streaks.",
-    "panel.topProb": "Top 3 Highest Odds",
+    "panel.topProb": "Top 3 Lowest Odds",
     "panel.top3": "Top 3 Luckiest Streaks",
     "error.label": "Error",
     "text.noEntry": "No record.",
@@ -1113,7 +1113,7 @@ function renderProbabilityLeaderboard() {
 
   const top = rows
     .slice()
-    .sort((a, b) => parseFloat(b.prob.pct) - parseFloat(a.prob.pct))
+    .sort((a, b) => (b.prob.oneIn || 0) - (a.prob.oneIn || 0))
     .slice(0, 3);
 
   const medals = ["🥇", "🥈", "🥉"];
