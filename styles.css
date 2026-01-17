@@ -184,9 +184,13 @@
         .journal-item.START { border-left-color: #22c55e; background: rgba(34, 197, 94, 0.08); }
         .journal-item.EXTEND { border-left-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
         .journal-item.END { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+        .journal-item.hit-second { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
         .journal-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
         .journal-left { display: flex; align-items: center; gap: 8px; }
         .journal-icons { display: flex; gap: 6px; align-items: center; }
+        .journal-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 999px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; border: 1px solid #2a2a2a; background: #0b0b0b; color: #cfcfcf; }
+        .journal-badge.conditional { border-color: #f59e0b; color: #facc15; }
+        .journal-badge.chain { border-color: #3b82f6; color: #93c5fd; }
         .journal-icon {
             width: 20px; height: 20px; border-radius: 6px; background: #0b0b0b;
             box-shadow: 0 0 10px rgba(83, 252, 24, 0.15); border: 1px solid #222; object-fit: contain;
