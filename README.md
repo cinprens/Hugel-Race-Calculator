@@ -25,9 +25,10 @@ If you find this project useful, consider sponsoring me on GitHub to help keep i
 | ![ANGELING](https://github.com/user-attachments/assets/4fbf4c0e-47c9-47f1-8c0c-888cd8bf19b4) **Angeling**  | **\$50 one-time**  | Holy aura, pure bounce, golden heart.                      |
 | ![GHOSTRING](https://github.com/user-attachments/assets/c72e672a-a499-4e0a-bb6b-2ec6e6756091) **Ghostring** | **\$100 one-time** | Ethereal vibes, phase-through energy, the cutest haunting. |
 | ![DEVILING](https://github.com/user-attachments/assets/aa92be65-794f-445a-9c77-08adc14e2229) **Deviling**  | **\$250 one-time** | Mischievous shadows, pink chaos, the master of cursed fun. |
-<img width="1342" height="896" alt="image" src="https://github.com/user-attachments/assets/6355b636-8e97-4954-96bb-d524e677ba13" />
-KAHİN V2
-<img width="1599" height="880" alt="image" src="https://github.com/user-attachments/assets/92cc6cfd-2218-4a34-b4cf-b34f52280b7e" />
+<img width="1571" height="903" alt="Screenshot 2026-01-17 044935" src="https://github.com/user-attachments/assets/6bed425b-e83a-4c10-81d1-fe842f5ced9a" />
+
+<img width="1674" height="893" alt="Screenshot 2026-01-17 044941" src="https://github.com/user-attachments/assets/042334f9-b0cb-451a-83bf-7fcdfcc783d0" />
+
 
 For kahin html image file needed
 monster file in desktop
