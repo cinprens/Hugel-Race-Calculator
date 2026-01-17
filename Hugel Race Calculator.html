@@ -72,6 +72,14 @@ FIXLOG
                         <span id="ui-winrate" style="color:var(--kick-green)">%0.0</span>
                     </div>
                 </div>
+                <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.75rem; color:#9a9a9a;">
+                    <span data-i18n="label.entrySummary">Giriş</span>
+                    <b id="ui-entry-summary" style="color:#fff;">0</b>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.75rem; color:#9a9a9a;">
+                    <span data-i18n="label.rewardEstimate">ÖDÜL TAHMİNİ</span>
+                    <b id="ui-reward-estimate" style="color:#fff;">0</b>
+                </div>
             </div>
         </div>
 
@@ -93,19 +101,35 @@ FIXLOG
         <div id="raw-alert" class="raw-warning" data-i18n="alert.raw">ÖNEMLİ DİKKAT: UZUN SÜREDİR RAW GELMEDİ!</div>
 
         <div class="panel">
-            <h3 data-i18n="panel.heatmap">Kazanma Sıklığı</h3>
-            <div id="heatmap-list"></div>
+            <h3 data-i18n="panel.phenomenon">🔥 Fenomenler (En Nadir Kanıtlar)</h3>
+            <div id="phenomenon-list" class="phenomenon-list"></div>
         </div>
 
         <div class="panel" style="opacity:0.4; transition:0.3s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4">
             <h3 data-i18n="panel.settings">Özel Ayarlar</h3>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;">
-                <input type="number" id="charCount" value="12" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
-                <input type="number" id="ticketCost" value="2000" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
-                <input type="number" id="medalReward" value="15" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
-                <input type="number" id="prizeCost" value="50" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
+            <div class="settings-grid">
+                <label>
+                    <span data-i18n="label.entryCount">Giriş adedi (bu tur)</span>
+                    <input type="number" id="entryCount" oninput="handleConfigInput('entryCount', this.value)">
+                </label>
+                <label>
+                    <span data-i18n="label.entryCostZeny">Giriş ücreti (Zeny / giriş)</span>
+                    <input type="number" id="entryCostZeny" oninput="handleConfigInput('entryCostZeny', this.value)">
+                </label>
+                <label>
+                    <span data-i18n="label.medalsPerReward">1 ödül için gereken madalya</span>
+                    <input type="number" id="medalsPerReward" oninput="handleConfigInput('medalsPerReward', this.value)">
+                </label>
+                <label>
+                    <span data-i18n="label.rewardValue">1 ödül değeri</span>
+                    <input type="number" id="rewardValue" oninput="handleConfigInput('rewardValue', this.value)">
+                </label>
+                <label>
+                    <span data-i18n="label.archiveLimit">Arşiv limiti (kayıt sayısı)</span>
+                    <input type="number" id="archiveLimit" oninput="handleConfigInput('archiveLimit', this.value)">
+                </label>
             </div>
-            <button onclick="resetData()" style="width:100%; background:#222; border:none; color:#d63031; font-size:0.7rem; cursor:pointer; padding:5px;" data-i18n="button.resetAll">RESET</button>
+            <button onclick="resetConfig()" style="width:100%; background:#222; border:none; color:#d63031; font-size:0.7rem; cursor:pointer; padding:5px;" data-i18n="button.resetAll">RESET</button>
         </div>
 
         </div>
