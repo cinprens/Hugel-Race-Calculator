@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<!--
+FIXLOG
+- SubmitRound doğrulama sıkılaştırıldı ve mod bazlı hata mesajları eklendi.
+- Raw/Double repeat anahtarları sayısal sıralama ve ayraçla güncellendi.
+- Streak defteri roundId/ts bağlamı turlardan alınacak şekilde düzeltildi.
+- Journal eşik varsayılanları 2/2 yapıldı, clamp min 1 korunuyor.
+- UI medals tek seferde yazılıyor; mod değişiminde sonuçlar temizleniyor.
+-->
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RO Hugel Streamer Pro (Probability Ed.)</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+    <div class="top-bar">
+        <div class="nav-group">
+            <button class="nav-btn active" id="nav-main" onclick="showPage('main')">Ana Ekran</button>
+            <button class="nav-btn" id="nav-journal" onclick="showPage('journal')">Streak Defteri</button>
+        </div>
+        <button class="journal-btn" onclick="undo()">Geri Al</button>
+    </div>
+
+    <div id="page-main" class="page active">
+        <div class="layout-grid">
+
+    <div class="game-section">
+        <div class="header-btn-group">
+            <button class="mode-btn active" id="btn-single" onclick="setMode('single')">Tekli Mod</button>
+            <button class="mode-btn" id="btn-double" onclick="setMode('double')">İkili Mod</button>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <div style="color:var(--kick-green); font-weight:900; margin-bottom:10px; letter-spacing:1px;">1. BAHİS SEÇİMİ</div>
+            <div class="grid-3" id="bet-grid"></div>
+        </div>
+
+        <div>
+            <div style="color:#666; font-weight:900; margin-bottom:10px; letter-spacing:1px;">2. YARIŞ SONUCU</div>
+            <div class="grid-3" id="res-grid"></div>
+        </div>
+
+        <button class="action-btn" onclick="submitRound()">VERİYİ İŞLE</button>
+        <div id="status-text" style="text-align:center; margin-top:15px; color:#555; font-size:0.9rem;">Bahis Bekleniyor...</div>
+    </div>
+
+    <div class="stats-tower">
+
+        <div class="panel" style="border-top:3px solid var(--kick-green);">
+            <h3>Kasa Durumu</h3>
+            <div class="scoreboard">
+                <div class="total-medals" id="ui-medals">0</div>
+                <div style="color:#555; font-size:0.8rem; font-weight:bold; letter-spacing:1px;">TOPLAM MADALYA</div>
+                
+                <div class="sub-stats">
+                    <div style="text-align:left;">
+                        <span style="display:block; color:#555; font-size:0.7rem;">HARCANAN</span>
+                        <span id="ui-zeny" style="color:var(--danger)">0z</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="display:block; color:#555; font-size:0.7rem;">WIN RATE</span>
+                        <span id="ui-winrate" style="color:var(--kick-green)">%0.0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Manuel Madalya</h3>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <input type="number" id="extraMedalsInput" value="0" style="flex:1; background:#000; border:1px solid #333; color:#fff; padding:8px; width:100%;">
+                <button class="journal-btn" onclick="addExtraMedals()">Ekle</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#9a9a9a;">
+                <span>Toplam Manuel</span>
+                <b id="ui-extra-medals" style="color:#fff;">0</b>
+            </div>
+            <div style="margin-top:6px; text-align:right;">
+                <button class="journal-btn" onclick="resetExtraMedals()">Sıfırla</button>
+            </div>
+        </div>
+
+        <div id="raw-alert" class="raw-warning">ÖNEMLİ DİKKAT: UZUN SÜREDİR RAW GELMEDİ!</div>
+
+        <div class="panel">
+            <h3>Seriler & İhtimaller</h3>
+            <div id="streak-list">
+                <div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Kazanma Sıklığı</h3>
+            <div id="heatmap-list"></div>
+        </div>
+
+        <div class="panel" style="flex-grow:1;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Son 20 Yarış</h3>
+                <span style="font-size:0.7rem; cursor:pointer; color:var(--danger)" onclick="undo()">GERİ AL</span>
+            </div>
+            <div style="max-height:300px; overflow-y:auto;">
+                <table class="log-table">
+                    <tbody id="history-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel" style="opacity:0.4; transition:0.3s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4">
+            <h3>Özel Ayarlar</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:5px;">
+                <input type="number" id="charCount" value="12" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
+                <input type="number" id="ticketCost" value="2000" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
+                <input type="number" id="medalReward" value="15" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
+                <input type="number" id="prizeCost" value="50" style="background:#000; border:1px solid #333; color:#fff; padding:5px; width:100%;">
+            </div>
+            <button onclick="resetData()" style="width:100%; background:#222; border:none; color:#d63031; font-size:0.7rem; cursor:pointer; padding:5px;">RESET</button>
+        </div>
+
+        </div>
+    </div>
+
+    <div id="page-journal" class="page">
+        <div class="layout-grid journal-page-grid">
+            <div class="journal-page-left">
+                <div class="panel">
+                    <h3>Defter Kontrol</h3>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                        <button class="journal-btn" onclick="startJournalComputation()">Hesaplamayı Başlat</button>
+                        <button class="journal-btn" onclick="renderJournal(true)">Listele</button>
+                        <button class="journal-btn" onclick="triggerImport()">Geçmiş Aktar (JSON)</button>
+                        <input id="importHistoryFile" type="file" accept=".json,application/json" style="display:none" onchange="handleImportFile(event)">
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px;">
+                        <button class="journal-btn" onclick="downloadJournal('csv')">Defteri İndir (CSV)</button>
+                        <button class="journal-btn" onclick="downloadJournal('json')">Defteri İndir (JSON)</button>
+                        <button class="journal-btn" onclick="copyJournalJson()">JSON Kopyala</button>
+                        <button class="journal-btn" onclick="clearJournal()">Defteri Temizle</button>
+                    </div>
+                </div>
+                <div class="panel">
+                    <h3>Uzun Kayıtlar</h3>
+                    <div class="journal-long-meta">
+                        <span>Toplam</span>
+                        <b id="journal-total-count">0</b>
+                    </div>
+                    <div id="journal-full-list" class="journal-long-list"></div>
+                    <div id="journal-full-empty" class="journal-empty" style="display:none;">Henüz kayıt yok.</div>
+                </div>
+            </div>
+            <div class="journal-page-right">
+                <div class="panel">
+                    <h3>Seçili Kayıt</h3>
+                    <div id="journal-detail-page" class="journal-detail-card"></div>
+                </div>
+                <div class="panel">
+                    <h3>Özet</h3>
+                    <div id="journal-summary-page" class="journal-detail-card"></div>
+                </div>
+                <div class="panel">
+                    <h3>En Şanslı 3 Streak</h3>
+                    <div id="leaderboard-list" class="leaderboard-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <script src="app.js" defer></script>
+</body>
+</html>
