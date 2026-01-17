@@ -29,7 +29,7 @@ const translations = {
     "button.undo": "Geri Al",
     "step.bet": "1. BAHİS SEÇİMİ",
     "step.result": "2. YARIŞ SONUCU",
-    "button.process": "VERİYİ İŞLE",
+    "button.process": "Veriyi İşle",
     "status.waiting": "Bahis Bekleniyor...",
     "status.enterResults": "Bahis: {bet} (Sonuçları gir)",
     "status.result": "Bahis: {bet} -> Sonuç: {result}",
@@ -45,7 +45,7 @@ const translations = {
     "panel.heatmap": "Kazanma Sıklığı",
     "panel.settings": "Özel Ayarlar",
     "button.resetAll": "RESET",
-    "panel.archiveControl": "Arşiv Kontrol",
+    "panel.archiveControl": "Arşiv Kontrolü",
     "button.compute": "Hesaplamayı Başlat",
     "button.list": "Listele",
     "button.importHistory": "Geçmiş Aktar (JSON)",
@@ -57,17 +57,22 @@ const translations = {
     "text.noErrors": "Henüz hata yok.",
     "panel.allRecords": "Tüm Kayıtlar",
     "label.total": "Toplam",
+    "label.len": "Uzunluk",
+    "label.type": "TIP",
+    "label.mode": "MOD",
     "text.noRecords": "Henüz kayıt yok.",
     "panel.last20": "Son 20 Yarış",
     "panel.selected": "Seçili Kayıt",
     "panel.summary": "Özet",
     "panel.streaksProb": "Seriler & İhtimaller",
     "text.noActiveStreak": "Aktif seri bulunamadı.",
+    "panel.topProb": "En Yüksek 3 Olasılık",
     "panel.top3": "En Şanslı 3 Seri",
     "error.label": "Hata",
     "text.noEntry": "Kayıt yok.",
     "text.noData": "Veri yok.",
     "text.noEnd": "Henüz END yok.",
+    "text.noProb": "Veri yok.",
     "summary.title": "Arşiv Özeti",
     "journal.round": "Tur kaydı",
     "confirm.clearArchive": "Arşivi temizlemek istiyor musun?",
@@ -89,7 +94,7 @@ const translations = {
     "button.undo": "Undo",
     "step.bet": "1. BET SELECTION",
     "step.result": "2. RACE RESULT",
-    "button.process": "PROCESS DATA",
+    "button.process": "Process Data",
     "status.waiting": "Waiting for bet...",
     "status.enterResults": "Bet: {bet} (Enter results)",
     "status.result": "Bet: {bet} -> Result: {result}",
@@ -117,17 +122,22 @@ const translations = {
     "text.noErrors": "No errors yet.",
     "panel.allRecords": "All Records",
     "label.total": "Total",
+    "label.len": "Length",
+    "label.type": "TYPE",
+    "label.mode": "MODE",
     "text.noRecords": "No records yet.",
     "panel.last20": "Last 20 Races",
     "panel.selected": "Selected Record",
     "panel.summary": "Summary",
     "panel.streaksProb": "Streaks & Odds",
     "text.noActiveStreak": "No active streaks.",
+    "panel.topProb": "Top 3 Highest Odds",
     "panel.top3": "Top 3 Luckiest Streaks",
     "error.label": "Error",
     "text.noEntry": "No record.",
     "text.noData": "No data.",
     "text.noEnd": "No END yet.",
+    "text.noProb": "No data.",
     "summary.title": "Archive Summary",
     "journal.round": "Round entry",
     "confirm.clearArchive": "Do you want to clear the archive?",
@@ -586,6 +596,7 @@ function renderJournal(forceRefresh = false) {
   if (detail) detail.innerHTML = renderJournalDetailHtml(entries[safeSel]);
   if (summary) summary.innerHTML = renderJournalSummaryHtml();
   if (leaderboard) leaderboard.innerHTML = renderLeaderboardHtml(entries);
+  renderProbabilityLeaderboard();
   renderJournalErrors();
 }
 
@@ -663,9 +674,9 @@ function renderJournalDetailHtml(e) {
   const ts = formatTs(e.ts);
   const prob = e.prob ? `%${e.prob.pct} (1/${e.prob.oneIn})` : "-";
   const pills = [
-    `<span class="journal-pill">TIP: <b>${escapeHtml(e.type)}</b></span>`,
-    `<span class="journal-pill">MOD: <b>${escapeHtml(e.streakType)}</b></span>`,
-    e.len ? `<span class="journal-pill">LEN: <b>${escapeHtml(String(e.len))}</b></span>` : ""
+    `<span class="journal-pill">${escapeHtml(t("label.type"))}: <b>${escapeHtml(e.type)}</b></span>`,
+    `<span class="journal-pill">${escapeHtml(t("label.mode"))}: <b>${escapeHtml(e.streakType)}</b></span>`,
+    e.len ? `<span class="journal-pill">${escapeHtml(t("label.len"))}: <b>${escapeHtml(String(e.len))}</b></span>` : ""
   ].filter(Boolean).join(" ");
 
   const subj = Array.isArray(e.subjectNames) && e.subjectNames.length ? e.subjectNames.join(" + ") : "-";
@@ -711,11 +722,11 @@ function renderLeaderboardHtml(entries) {
     .slice(0, 3);
 
   const medals = ["🥇", "🥈", "🥉"];
-  const medalNames = ["Altın", "Gümüş", "Bronz"];
+  const medalNames = state.language === "en" ? ["Gold", "Silver", "Bronze"] : ["Altın", "Gümüş", "Bronz"];
 
   return top.map((e, i) => {
     const title = journalTitle(e);
-    const meta = `${e.streakType} • Len ${e.len}`;
+    const meta = `${e.streakType} • ${t("label.len")} ${e.len}`;
     const medal = medals[i] || "🏅";
     const rankCls = `rank-${i + 1}`;
     return `
@@ -746,7 +757,7 @@ function journalTitle(e) {
 
 function journalMeta(e) {
   if (e.type === "ROUND") return t("journal.round");
-  return `Len: ${e.len}${e.subjectKey ? ` • Key: ${e.subjectKey}` : ""}`;
+  return `${t("label.len")}: ${e.len}${e.subjectKey ? ` • Key: ${e.subjectKey}` : ""}`;
 }
 
 // ---------- IMPORT / EXPORT ----------
@@ -963,6 +974,7 @@ function updateStats() {
   renderHistory();
   renderHeatmap();
   renderStreakPanel();
+  renderProbabilityLeaderboard();
   renderRawAlert(); // basit uyarı
 }
 
@@ -1017,15 +1029,9 @@ function renderHeatmap() {
   }).join("");
 }
 
-function renderStreakPanel() {
-  const targets = [
-    document.getElementById("streak-list-journal")
-  ].filter(Boolean);
-  if (!targets.length) return;
-
+function getActiveStreakRows() {
   const { tSingle, tPair } = resolveJournalThresholds();
   const curr = state.streaks || computeCurrentStreakState(state.history, monsters);
-
   const rows = [];
 
   monsters.forEach(m => {
@@ -1052,6 +1058,17 @@ function renderStreakPanel() {
     });
   }
 
+  return rows;
+}
+
+function renderStreakPanel() {
+  const targets = [
+    document.getElementById("streak-list-journal")
+  ].filter(Boolean);
+  if (!targets.length) return;
+
+  const rows = getActiveStreakRows();
+
   if (!rows.length) {
     targets.forEach(el => {
       el.innerHTML = `<div style="text-align:center; color:#444; font-size:0.8rem;">${escapeHtml(t("text.noActiveStreak"))}</div>`;
@@ -1069,7 +1086,7 @@ function renderStreakPanel() {
           ${r.icon ? `<img src="${r.icon}" style="width:22px; height:22px; border-radius:6px; border:1px solid #222; background:#0b0b0b;">` : `<span style="width:22px; height:22px; border-radius:6px; display:inline-block; background:#0b0b0b; border:1px solid #222;"></span>`}
           <div>
             <div style="font-weight:800; color:#fff; font-size:0.8rem;">${escapeHtml(r.title)}</div>
-            <div style="color:#9a9a9a; font-size:0.7rem;">Len: <b style="color:#fff;">${r.len}</b></div>
+            <div style="color:#9a9a9a; font-size:0.7rem;">${escapeHtml(t("label.len"))}: <b style="color:#fff;">${r.len}</b></div>
           </div>
         </div>
         <div style="text-align:right;">
@@ -1082,6 +1099,38 @@ function renderStreakPanel() {
   targets.forEach(el => {
     el.innerHTML = html;
   });
+}
+
+function renderProbabilityLeaderboard() {
+  const el = document.getElementById("probability-leaderboard");
+  if (!el) return;
+
+  const rows = getActiveStreakRows();
+  if (!rows.length) {
+    el.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noProb"))}</div>`;
+    return;
+  }
+
+  const top = rows
+    .slice()
+    .sort((a, b) => parseFloat(b.prob.pct) - parseFloat(a.prob.pct))
+    .slice(0, 3);
+
+  const medals = ["🥇", "🥈", "🥉"];
+  const medalNames = state.language === "en" ? ["Gold", "Silver", "Bronze"] : ["Altın", "Gümüş", "Bronz"];
+  el.innerHTML = top.map((r, i) => `
+      <div class="leaderboard-item rank-${i + 1}">
+        <div class="leader-medal" title="${medalNames[i] || "Madalya"}">${medals[i] || "🏅"}</div>
+        <div class="leader-main">
+          <div class="leader-title">${escapeHtml(r.title)}</div>
+          <div class="leader-meta">${escapeHtml(t("label.len"))} ${r.len}</div>
+        </div>
+        <div class="leader-prob">
+          <div><b>%${escapeHtml(String(r.prob.pct))}</b></div>
+          <div style="color:#9a9a9a; font-size:0.7rem;">1 / ${escapeHtml(String(r.prob.oneIn))}</div>
+        </div>
+      </div>
+  `).join("");
 }
 
 function renderRawAlert() {

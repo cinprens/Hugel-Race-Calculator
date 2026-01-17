@@ -19,8 +19,8 @@
             color: var(--text-main);
             margin: 0;
             padding: 20px;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow: auto;
             display: flex;
             justify-content: center;
         }
@@ -28,7 +28,7 @@
         .app-shell {
             width: 100%;
             max-width: 1700px;
-            height: 100%;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -65,7 +65,7 @@
         }
 
         .page { display: none; flex: 1; min-height: 0; }
-        .page.active { display: block; }
+        .page.active { display: flex; flex-direction: column; }
 
         /* LAYOUT: LEFT (GAME) - RIGHT (INFO TOWER) */
         .layout-grid {
@@ -74,6 +74,7 @@
             gap: 25px;
             width: 100%;
             max-width: 1700px;
+            min-height: 0;
             height: 100%;
         }
 
