@@ -15,6 +15,7 @@ let state = {
   history: [],
   journal: [],
   journalSelected: 0,
+  journalErrors: [],
   extraMedals: 0,
   journalSettings: { thresholdSingle: 2, thresholdPair: 2 },
   streaks: { singles: {}, pair: { key: null, len: 0 } },
@@ -29,6 +30,11 @@ window.onload = () => {
     rebuildJournalFromHistory();
     saveState();
   }
+  if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
+    logJournalError("Defter oluşturulamadı: geçmiş var ama defter boş kaldı.", {
+      historyCount: state.history.length
+    });
+  }
   const hashPage =
     location.hash === "#journal" ? "journal" :
     (location.hash === "#main" ? "main" : null);
@@ -38,6 +44,7 @@ window.onload = () => {
   render();
   updateStats();
   renderJournal();
+  renderJournalErrors();
 };
 
 function showPage(target) {
@@ -288,32 +295,86 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
 
   } catch (err) {
     console.error("Journal update failed:", err);
+    logJournalError("Journal update failed.", { error: String(err) });
   }
+}
+
+function logJournalError(message, details = {}) {
+  const list = Array.isArray(state.journalErrors) ? state.journalErrors : [];
+  const entry = {
+    ts: new Date().toISOString(),
+    message,
+    details
+  };
+  list.unshift(entry);
+  state.journalErrors = list.slice(0, 50);
+  saveState();
+  renderJournalErrors();
+}
+
+function renderJournalErrors() {
+  const list = document.getElementById("journal-error-list");
+  const empty = document.getElementById("journal-error-empty");
+  if (!list || !empty) return;
+
+  const entries = Array.isArray(state.journalErrors) ? state.journalErrors : [];
+  if (!entries.length) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+
+  empty.style.display = "none";
+  list.innerHTML = entries.map(e => {
+    const ts = formatTs(e.ts);
+    const detail = e.details ? JSON.stringify(e.details) : "";
+    return `
+      <div class="journal-item">
+        <div class="journal-top">
+          <div class="journal-left">
+            <div class="journal-title">Hata</div>
+            <div class="journal-meta">${escapeHtml(e.message || "Bilinmeyen hata")}</div>
+          </div>
+        </div>
+        <div class="journal-ts">${escapeHtml(ts)}${detail ? ` • ${escapeHtml(detail)}` : ""}</div>
+      </div>`;
+  }).join("");
 }
 
 
 function rebuildJournalFromHistory() {
-  const history = Array.isArray(state.history) ? state.history : [];
-  const target = [];
-  let prevSnap = snapshotWithCompat({ singles: {}, pair: { key: null, len: 0 } });
-  const tempHistory = [];
-  const ordered = history.slice().reverse();
+  try {
+    const history = Array.isArray(state.history) ? state.history : [];
+    const target = [];
+    let prevSnap = snapshotWithCompat({ singles: {}, pair: { key: null, len: 0 } });
+    const tempHistory = [];
+    const ordered = history.slice().reverse();
 
-  ordered.forEach(round => {
-    tempHistory.unshift(round);
-    const currSnap = computeCurrentStreakState(tempHistory, monsters);
-    updateJournalFromStreakChange(prevSnap, currSnap, round, {
-      target,
-      thresholds: resolveJournalThresholds(state.journalSettings),
-      settings: state.journalSettings
+    ordered.forEach(round => {
+      tempHistory.unshift(round);
+      const currSnap = computeCurrentStreakState(tempHistory, monsters);
+      updateJournalFromStreakChange(prevSnap, currSnap, round, {
+        target,
+        thresholds: resolveJournalThresholds(state.journalSettings),
+        settings: state.journalSettings
+      });
+      prevSnap = snapshotWithCompat(currSnap);
     });
-    prevSnap = snapshotWithCompat(currSnap);
-  });
 
-  state.journal = target;
-  state.journalSelected = 0;
-  state._streakSnapshot = snapshotWithCompat(prevSnap);
-  state.streaks = snapshotWithCompat(prevSnap);
+    state.journal = target;
+    state.journalSelected = 0;
+    state._streakSnapshot = snapshotWithCompat(prevSnap);
+    state.streaks = snapshotWithCompat(prevSnap);
+
+    if (history.length && !target.length) {
+      logJournalError("Defter yeniden oluşturuldu ama kayıt oluşmadı.", {
+        historyCount: history.length
+      });
+    }
+  } catch (err) {
+    console.error("Journal rebuild failed:", err);
+    logJournalError("Journal rebuild failed.", { error: String(err) });
+  }
 }
 
 function startJournalComputation() {
@@ -321,6 +382,7 @@ function startJournalComputation() {
   saveState();
   renderJournal(true);
   updateStats();
+  renderJournalErrors();
 }
 
 
@@ -359,6 +421,7 @@ function renderJournal(forceRefresh = false) {
   if (detail) detail.innerHTML = renderJournalDetailHtml(entries[safeSel]);
   if (summary) summary.innerHTML = renderJournalSummaryHtml();
   if (leaderboard) leaderboard.innerHTML = renderLeaderboardHtml(entries);
+  renderJournalErrors();
 }
 
 function resetJournal() {
@@ -581,7 +644,10 @@ function handleImportFile(event) {
     try {
       const data = JSON.parse(String(reader.result || ""));
       const history = Array.isArray(data) ? data : (Array.isArray(data.history) ? data.history : []);
-      if (!Array.isArray(history)) return;
+      if (!Array.isArray(history)) {
+        logJournalError("Import başarısız: geçerli geçmiş bulunamadı.", { type: typeof data });
+        return;
+      }
       state.history = history;
       rebuildJournalFromHistory();
       saveState();
@@ -590,6 +656,7 @@ function handleImportFile(event) {
       renderJournal(true);
     } catch (err) {
       console.warn("Import failed:", err);
+      logJournalError("Import failed.", { error: String(err) });
     }
   };
   reader.readAsText(file);
@@ -684,12 +751,14 @@ function resetData() {
   state.history = [];
   state.journal = [];
   state.journalSelected = 0;
+  state.journalErrors = [];
   state.streaks = { singles: {}, pair: { key: null, len: 0 } };
   state._streakSnapshot = { singles: {}, pair: { key: null, len: 0 } };
   saveState();
   render();
   updateStats();
   renderJournal();
+  renderJournalErrors();
 }
 
 function addExtraMedals() {
@@ -784,8 +853,11 @@ function renderHeatmap() {
 }
 
 function renderStreakPanel() {
-  const el = document.getElementById("streak-list");
-  if (!el) return;
+  const targets = [
+    document.getElementById("streak-list-journal"),
+    document.getElementById("streak-list")
+  ].filter(Boolean);
+  if (!targets.length) return;
 
   const { tSingle, tPair } = resolveJournalThresholds();
   const curr = state.streaks || computeCurrentStreakState(state.history, monsters);
@@ -817,14 +889,16 @@ function renderStreakPanel() {
   }
 
   if (!rows.length) {
-    el.innerHTML = `<div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>`;
+    targets.forEach(el => {
+      el.innerHTML = `<div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>`;
+    });
     return;
   }
 
   // en "uçuk" olanlar üstte
   rows.sort((a, b) => (b.prob.oneIn || 0) - (a.prob.oneIn || 0));
 
-  el.innerHTML = rows.map(r => `
+  const html = rows.map(r => `
     <div style="background:#0f0f0f; border:1px solid #1f1f1f; border-radius:8px; padding:8px; margin-top:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -841,6 +915,9 @@ function renderStreakPanel() {
       </div>
     </div>
   `).join("");
+  targets.forEach(el => {
+    el.innerHTML = html;
+  });
 }
 
 function renderRawAlert() {
@@ -870,6 +947,7 @@ function saveState() {
       history: state.history,
       journal: state.journal,
       journalSelected: state.journalSelected,
+      journalErrors: state.journalErrors,
       extraMedals: state.extraMedals,
       journalSettings: state.journalSettings,
       streaks: state.streaks,
@@ -898,6 +976,7 @@ function loadState() {
       state.history = Array.isArray(parsed.history) ? parsed.history : [];
       state.journal = Array.isArray(parsed.journal) ? parsed.journal : [];
       state.journalSelected = parsed.journalSelected || 0;
+      state.journalErrors = Array.isArray(parsed.journalErrors) ? parsed.journalErrors : [];
       state.extraMedals = typeof parsed.extraMedals === "number" ? parsed.extraMedals : 0;
       state.journalSettings = parsed.journalSettings || { thresholdSingle: 2, thresholdPair: 2 };
       const snap = snapshotWithCompat(parsed._streakSnapshot || parsed.streaks || { singles: {}, pair: { key: null, len: 0 } });
