@@ -8,6 +8,13 @@ const monsters = [
   { id: 6, name: "Bapho",   url: "https://static.divine-pride.net/images/mobs/png/1101.png" } // Bapho Jr yerine benzer ikon
 ];
 const MONSTER_COUNT = monsters.length;
+const CONFIG_KEY = "hugel_config_v2";
+const CONFIG_DEFAULTS = {
+  analysisWindowRounds: 12,
+  medalsPerReward: 15,
+  archiveLimit: 2000,
+  rewardValue: 50
+};
 
 let state = {
   mode: "single",
@@ -18,6 +25,7 @@ let state = {
   journalSelected: 0,
   journalErrors: [],
   extraMedals: 0,
+  config: { ...CONFIG_DEFAULTS },
   journalSettings: { thresholdSingle: 2, thresholdPair: 2 },
   streaks: {
     singles: {},
@@ -54,6 +62,7 @@ const translations = {
     "label.totalMedals": "TOPLAM MADALYA",
     "label.spent": "HARCANAN",
     "label.winRate": "WIN RATE",
+    "label.rewardEstimate": "ÖDÜL TAHMİNİ",
     "panel.manualMedals": "Manuel Madalya",
     "button.add": "Ekle",
     "label.totalManual": "Toplam Manuel",
@@ -61,6 +70,11 @@ const translations = {
     "alert.raw": "ÖNEMLİ DİKKAT: UZUN SÜREDİR RAW GELMEDİ!",
     "panel.heatmap": "Kazanma Sıklığı",
     "panel.settings": "Özel Ayarlar",
+    "panel.phenomenon": "🔥 Fenomenler (En Nadir Kanıtlar)",
+    "label.analysisWindow": "Analiz penceresi (son N tur)",
+    "label.medalsPerReward": "1 ödül için gereken madalya",
+    "label.archiveLimit": "Arşiv limiti (kayıt)",
+    "label.rewardValue": "1 ödül değeri",
     "button.resetAll": "RESET",
     "panel.archiveControl": "Arşiv Kontrolü",
     "button.compute": "Hesaplamayı Başlat",
@@ -90,8 +104,10 @@ const translations = {
     "text.noData": "Veri yok.",
     "text.noEnd": "Henüz END yok.",
     "text.noProb": "Veri yok.",
+    "text.noPhenomenon": "Henüz fenomen yok.",
     "summary.title": "Arşiv Özeti",
     "journal.round": "Tur kaydı",
+    "label.winFrequencySnapshot": "Kazanma Sıklığı (snapshot)",
     "confirm.clearArchive": "Arşivi temizlemek istiyor musun?",
     "confirm.resetAll": "Tüm geçmiş ve arşiv sıfırlansın mı?",
     "error.archiveEmpty": "Arşiv oluşturulamadı: geçmiş var ama arşiv boş kaldı.",
@@ -119,6 +135,7 @@ const translations = {
     "label.totalMedals": "TOTAL MEDALS",
     "label.spent": "SPENT",
     "label.winRate": "WIN RATE",
+    "label.rewardEstimate": "REWARD ESTIMATE",
     "panel.manualMedals": "Manual Medals",
     "button.add": "Add",
     "label.totalManual": "Manual Total",
@@ -126,6 +143,11 @@ const translations = {
     "alert.raw": "IMPORTANT: NO RAW FOR A LONG TIME!",
     "panel.heatmap": "Win Frequency",
     "panel.settings": "Advanced Settings",
+    "panel.phenomenon": "🔥 Phenomena (Rarest Evidence)",
+    "label.analysisWindow": "Analysis window (last N rounds)",
+    "label.medalsPerReward": "Medals needed per reward",
+    "label.archiveLimit": "Archive limit (entries)",
+    "label.rewardValue": "Reward value",
     "button.resetAll": "RESET",
     "panel.archiveControl": "Archive Control",
     "button.compute": "Rebuild",
@@ -155,8 +177,10 @@ const translations = {
     "text.noData": "No data.",
     "text.noEnd": "No END yet.",
     "text.noProb": "No data.",
+    "text.noPhenomenon": "No phenomena yet.",
     "summary.title": "Archive Summary",
     "journal.round": "Round entry",
+    "label.winFrequencySnapshot": "Win Frequency (snapshot)",
     "confirm.clearArchive": "Do you want to clear the archive?",
     "confirm.resetAll": "Reset all history and archive?",
     "error.archiveEmpty": "Archive not created: history exists but archive is empty.",
@@ -205,8 +229,116 @@ function setLanguage(lang) {
 
 const LS_KEYS = ["prob_hugel_state_v2", "prob_hugel_state", "prob_hugel_state_v1"];
 
+function normalizeConfig(input = {}) {
+  const base = { ...CONFIG_DEFAULTS };
+  const toInt = (value, fallback) => {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const toFloat = (value, fallback) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  return {
+    analysisWindowRounds: Math.max(1, toInt(input.analysisWindowRounds, base.analysisWindowRounds)),
+    medalsPerReward: Math.max(1, toInt(input.medalsPerReward, base.medalsPerReward)),
+    archiveLimit: Math.max(1, toInt(input.archiveLimit, base.archiveLimit)),
+    rewardValue: Math.max(0, toFloat(input.rewardValue, base.rewardValue))
+  };
+}
+
+function loadLegacyConfig() {
+  const legacyKeys = ["hugel_config", "prob_hugel_config", "prob_hugel_settings"];
+  for (const key of legacyKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {}
+  }
+  for (const key of LS_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        const mapped = {
+          analysisWindowRounds: parsed.charCount,
+          medalsPerReward: parsed.medalReward,
+          archiveLimit: parsed.ticketCost,
+          rewardValue: parsed.prizeCost
+        };
+        if (Object.values(mapped).some(v => v != null)) return mapped;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function saveConfig() {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
+  } catch (err) {
+    console.warn("Config not saved:", err);
+  }
+}
+
+function loadConfig() {
+  let config = null;
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (raw) config = JSON.parse(raw);
+  } catch {}
+  if (!config) config = loadLegacyConfig();
+  state.config = normalizeConfig(config || CONFIG_DEFAULTS);
+  saveConfig();
+}
+
+function applyArchiveLimit() {
+  const limit = Math.max(1, parseInt(state.config?.archiveLimit, 10) || CONFIG_DEFAULTS.archiveLimit);
+  if (!Array.isArray(state.journal)) return false;
+  if (state.journal.length <= limit) return false;
+  state.journal = state.journal.slice(0, limit);
+  state.journalSelected = clamp(state.journalSelected || 0, 0, state.journal.length - 1);
+  return true;
+}
+
+function setConfig(patch = {}) {
+  state.config = normalizeConfig({ ...state.config, ...patch });
+  saveConfig();
+  const trimmed = applyArchiveLimit();
+  if (trimmed) saveState();
+  renderSettingsInputs();
+  updateStats();
+  if (trimmed) renderJournal();
+}
+
+function handleConfigInput(field, rawValue) {
+  if (!field) return;
+  const parser = field === "rewardValue" ? parseFloat : (value) => parseInt(value, 10);
+  const parsed = parser(rawValue);
+  if (!Number.isFinite(parsed)) {
+    renderSettingsInputs();
+    return;
+  }
+  setConfig({ [field]: parsed });
+}
+
+function resetConfig() {
+  state.config = { ...CONFIG_DEFAULTS };
+  saveConfig();
+  const trimmed = applyArchiveLimit();
+  if (trimmed) saveState();
+  renderSettingsInputs();
+  updateStats();
+  renderJournal();
+}
+
 window.onload = () => {
+  loadConfig();
   loadState();
+  applyArchiveLimit();
   try { state.language = localStorage.getItem("prob_hugel_lang") || "tr"; }
   catch { state.language = "tr"; }
   if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
@@ -292,8 +424,25 @@ function toggleRes(id) {
   render();
 }
 
+function renderSettingsInputs() {
+  const cfg = state.config || CONFIG_DEFAULTS;
+  const map = {
+    analysisWindowRounds: "analysisWindowRounds",
+    medalsPerReward: "medalsPerReward",
+    archiveLimit: "archiveLimit",
+    rewardValue: "rewardValue"
+  };
+  Object.entries(map).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const nextValue = cfg[key];
+    if (el.value !== String(nextValue)) el.value = String(nextValue);
+  });
+}
+
 function render() {
   sanitizeSelections();
+  renderSettingsInputs();
 
   // Bet Grid
   document.getElementById("bet-grid").innerHTML = monsters.map(m => {
@@ -340,6 +489,7 @@ function render() {
 function normalizeStreakState(input) {
   const base = input || {};
   return {
+    config: normalizeConfig(base.config || state.config || CONFIG_DEFAULTS),
     singles: base.singles || {},
     singlesPairAny: base.singlesPairAny || base.singles || {},
     singlesFirst: base.singlesFirst || {},
@@ -352,6 +502,7 @@ function normalizeStreakState(input) {
 
 function snapshotWithCompat(curr) {
   return {
+    config: normalizeConfig(curr.config || state.config || CONFIG_DEFAULTS),
     singles: curr.singles || {},
     singlesPairAny: curr.singlesPairAny || {},
     singlesFirst: curr.singlesFirst || {},
@@ -749,6 +900,22 @@ function resolveJournalThresholds(settings) {
   return { tSingle, tPair };
 }
 
+function buildWinFrequencySnapshot(history = []) {
+  const snapshot = {};
+  monsters.forEach(m => {
+    snapshot[m.name.toLowerCase()] = 0;
+  });
+  history.forEach(r => {
+    (r.result || []).forEach(id => {
+      const m = getMonsterById(id);
+      if (!m) return;
+      const key = m.name.toLowerCase();
+      snapshot[key] = (snapshot[key] || 0) + 1;
+    });
+  });
+  return snapshot;
+}
+
 // ---------- JOURNAL CORE ----------
 function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}) {
   try {
@@ -760,6 +927,7 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
     const { tSingle, tPair } = thresholds;
     if (!Array.isArray(target)) return;
 
+    const winFrequencySnapshot = roundCtx?.winFrequencySnapshot || null;
     const addEntry = (phase, streakType, subjectKey, subjectNames, streakLen, extra = {}) => {
       const ts = (roundCtx && roundCtx.id) ? new Date(roundCtx.id).toISOString() : new Date().toISOString();
       const eventType = streakType === "PAIR" ? "PAIR" : "SINGLE";
@@ -791,7 +959,8 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
         model,
         length: model === "CHAIN" ? streakLen : 1,
         keys: keys.map(key => Number(key)).filter(Number.isFinite),
-        context: baseContext
+        context: baseContext,
+        winFrequencySnapshot
       };
       const probInfo = buildProbabilityInfo(entryBase, MONSTER_COUNT);
       target.unshift({
@@ -825,7 +994,8 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
         context: { roundType, slotsPerRound: roundType === "PAIR" ? 2 : 1, targetKey: null, note: "round-outcome", mode: "BASE", kind: "HIT" },
         probability: null,
         odds: null,
-        difficulty: null
+        difficulty: null,
+        winFrequencySnapshot
       });
     };
 
@@ -1018,8 +1188,12 @@ function rebuildJournalFromHistory() {
 
     ordered.forEach(round => {
       tempHistory.unshift(round);
+      const roundWithSnapshot = {
+        ...round,
+        winFrequencySnapshot: round.winFrequencySnapshot || buildWinFrequencySnapshot(tempHistory)
+      };
       const currSnap = computeCurrentStreakState(tempHistory, monsters);
-      updateJournalFromStreakChange(prevSnap, currSnap, round, {
+      updateJournalFromStreakChange(prevSnap, currSnap, roundWithSnapshot, {
         target,
         thresholds: resolveJournalThresholds(state.journalSettings),
         settings: state.journalSettings
@@ -1031,6 +1205,7 @@ function rebuildJournalFromHistory() {
     state.journalSelected = 0;
     state._streakSnapshot = snapshotWithCompat(prevSnap);
     state.streaks = snapshotWithCompat(prevSnap);
+    applyArchiveLimit();
 
     if (history.length && !target.length) {
       logJournalError(t("error.archiveRebuildEmpty"), {
@@ -1098,6 +1273,63 @@ function resetJournal() {
   renderJournal();
 }
 
+function getMonsterByKey(key) {
+  return monsters.find(m => m.name.toLowerCase() === String(key).toLowerCase());
+}
+
+function getWinFrequencySnapshot(entry) {
+  return entry?.winFrequencySnapshot || null;
+}
+
+function renderWinFrequencySnapshotMini(snapshot) {
+  if (!snapshot) return "";
+  const rows = Object.entries(snapshot)
+    .filter(([, value]) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  if (!rows.length) return "";
+  const max = Math.max(1, rows[0][1] || 1);
+  return `
+    <div class="winfreq-mini">
+      ${rows.map(([key, value]) => {
+        const monster = getMonsterByKey(key);
+        const label = monster ? monster.name : key;
+        const pct = (value / max) * 100;
+        return `
+          <div class="winfreq-row">
+            ${monster ? `<img src="${monster.url}" alt="${escapeHtml(label)}">` : ""}
+            <span class="winfreq-name">${escapeHtml(label)}</span>
+            <span class="winfreq-count">${value}</span>
+            <span class="winfreq-bar"><span style="width:${pct.toFixed(1)}%"></span></span>
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
+function renderWinFrequencySnapshotFull(snapshot) {
+  if (!snapshot) return "";
+  const rows = Object.entries(snapshot)
+    .filter(([, value]) => Number.isFinite(value))
+    .sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return "";
+  const max = Math.max(1, rows[0][1] || 1);
+  return `
+    <div class="winfreq-full">
+      ${rows.map(([key, value]) => {
+        const monster = getMonsterByKey(key);
+        const label = monster ? monster.name : key;
+        const pct = (value / max) * 100;
+        return `
+          <div class="winfreq-row">
+            ${monster ? `<img src="${monster.url}" alt="${escapeHtml(label)}">` : ""}
+            <span class="winfreq-name">${escapeHtml(label)}</span>
+            <span class="winfreq-count">${value}</span>
+            <span class="winfreq-bar"><span style="width:${pct.toFixed(1)}%"></span></span>
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
 function renderJournalItemHtml(e, idx, isActive) {
   const normalized = normalizeEntry(e);
   const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
@@ -1116,6 +1348,7 @@ function renderJournalItemHtml(e, idx, isActive) {
     ? `<div class="prob">${probLabel}</div><div class="onein">${escapeHtml(probInfo.oddsText || "-")}</div>`
     : `<div class="prob">—</div><div class="onein">${escapeHtml(emptyLabel)}</div>`;
   const ts = formatTs(normalized.ts);
+  const winFreqMini = renderWinFrequencySnapshotMini(getWinFrequencySnapshot(e));
 
   return `
   <div class="journal-item ${escapeHtml(typeCls)} ${escapeHtml(hitCls)} ${activeCls}" onclick="selectJournalEntry(${idx})">
@@ -1130,6 +1363,7 @@ function renderJournalItemHtml(e, idx, isActive) {
       <div class="journal-right"${tooltip}>${probLine}</div>
     </div>
     <div class="journal-ts">${escapeHtml(ts)}${normalized.roundId ? ` • #${escapeHtml(String(normalized.roundId))}` : ""}</div>
+    ${winFreqMini}
   </div>`;
 }
 
@@ -1209,6 +1443,7 @@ function renderJournalDetailHtml(e) {
   const contextText = normalized.context
     ? `${normalized.context.roundType || "-"} slots:${normalized.context.slotsPerRound ?? "-"} mode:${normalized.context.mode || "-"} kind:${normalized.context.kind || "-"} target:${normalized.context.targetKey ?? "-"} ${normalized.context.note || ""}`.trim()
     : "-";
+  const winFrequencySnapshot = renderWinFrequencySnapshotFull(getWinFrequencySnapshot(e));
 
   return `
     <div class="journal-detail-title">${escapeHtml(title)}</div>
@@ -1221,6 +1456,7 @@ function renderJournalDetailHtml(e) {
     <div class="journal-kv"><span>İhtimal</span><b>${escapeHtml(prob)}</b></div>
     <div class="journal-kv"><span>Scientific</span><b>${escapeHtml(sci)}</b></div>
     <div class="journal-kv"><span>Diff</span><b>${escapeHtml(diffText)}</b></div>
+    ${winFrequencySnapshot ? `<div class="journal-kv"><span>${escapeHtml(t("label.winFrequencySnapshot"))}</span></div>${winFrequencySnapshot}` : ""}
   `;
 }
 
@@ -1317,10 +1553,17 @@ function downloadJournal(format) {
     return;
   }
 
-  const header = ["ts", "roundId", "phase", "eventType", "model", "length", "keys", "context", "probability", "odds", "difficulty"];
+  const snapshotColumns = monsters.map(m => `${m.name.toLowerCase()}Count`);
+  const header = ["ts", "roundId", "phase", "eventType", "model", "length", "keys", "context", "probability", "odds", "difficulty", "winFrequencySnapshot", ...snapshotColumns];
   const rows = entries.map(e => {
     const normalized = normalizeEntry(e);
     const probInfo = buildProbabilityInfo(normalized, MONSTER_COUNT);
+    const snapshot = getWinFrequencySnapshot(e);
+    const snapshotJson = snapshot ? JSON.stringify(snapshot) : "";
+    const snapshotCounts = monsters.map(m => {
+      const key = m.name.toLowerCase();
+      return snapshot && Number.isFinite(snapshot[key]) ? snapshot[key] : "";
+    });
     return [
       normalized.ts || "",
       normalized.roundId ?? "",
@@ -1332,7 +1575,9 @@ function downloadJournal(format) {
       normalized.context ? JSON.stringify(normalized.context) : "",
       probInfo.probability ?? "",
       probInfo.odds ? JSON.stringify(probInfo.odds) : "",
-      probInfo.difficulty ?? ""
+      probInfo.difficulty ?? "",
+      snapshotJson,
+      ...snapshotCounts
     ];
   });
   const csv = [header, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
@@ -1426,6 +1671,7 @@ function submitRound() {
 
   // update history
   state.history.unshift(round);
+  round.winFrequencySnapshot = buildWinFrequencySnapshot(state.history);
 
   // update streak snapshot + journal incrementally (no full recompute)
   const prevSnap = snapshotWithCompat(normalizeStreakState(state._streakSnapshot));
@@ -1433,6 +1679,7 @@ function submitRound() {
   updateJournalFromStreakChange(prevSnap, currSnap, round);
   state._streakSnapshot = snapshotWithCompat(currSnap);
   state.streaks = snapshotWithCompat(currSnap);
+  applyArchiveLimit();
 
   // clear selections for next input
   state.bet = [];
@@ -1541,10 +1788,11 @@ function resetExtraMedals() {
 
 // ---------- STATS / PANELS ----------
 function updateStats() {
-  const charCount = clampInt(readNumber("charCount", 12), 0, 999999);
-  const ticketCost = clampInt(readNumber("ticketCost", 2000), 0, 999999999);
-  const medalReward = clampInt(readNumber("medalReward", 15), 0, 999999);
-  const prizeCost = clampInt(readNumber("prizeCost", 50), 1, 999999);
+  const cfg = normalizeConfig(state.config || CONFIG_DEFAULTS);
+  const charCount = 12;
+  const ticketCost = 2000;
+  const medalReward = clampInt(cfg.medalsPerReward, 1, 999999);
+  const prizeCost = Number.isFinite(cfg.rewardValue) ? cfg.rewardValue : CONFIG_DEFAULTS.rewardValue;
 
   const rounds = state.history.length;
   const wins = state.history.filter(r => !!r.win).length;
@@ -1552,14 +1800,17 @@ function updateStats() {
   const spentZeny = rounds * charCount * ticketCost;
   const earnedMedals = wins * medalReward;
   const totalMedals = earnedMedals + (state.extraMedals || 0);
+  const rewardCount = medalReward > 0 ? Math.floor(totalMedals / medalReward) : 0;
+  const rewardEstimate = rewardCount * prizeCost;
 
   setText("ui-zeny", `${fmtNum(spentZeny)}z`);
   setText("ui-extra-medals", fmtNum(state.extraMedals || 0));
   setText("ui-medals", fmtNum(totalMedals));
   setText("ui-winrate", rounds ? `%${((wins / rounds) * 100).toFixed(1)}` : "%0.0");
+  setText("ui-reward-estimate", fmtNum(rewardEstimate));
 
   renderHistory();
-  renderHeatmap();
+  renderPhenomenonPanel();
   renderStreakPanel();
   renderProbabilityLeaderboard();
   renderRawAlert(); // basit uyarı
@@ -1700,6 +1951,86 @@ function renderStreakPanel() {
   targets.forEach(el => {
     el.innerHTML = html;
   });
+}
+
+function getPhenomenonRows() {
+  const entries = Array.isArray(state.journal) ? state.journal : [];
+  const rows = entries.map(e => {
+    const normalized = normalizeEntry(e);
+    return {
+      entry: normalized,
+      raw: e,
+      probInfo: buildProbabilityInfo(normalized, MONSTER_COUNT)
+    };
+  }).filter(row => {
+    const phase = String(row.entry.phase || "");
+    if (row.entry.model !== "CHAIN") return false;
+    if (!phase.startsWith("EXTEND")) return false;
+    if (row.probInfo.probability == null) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => (a.probInfo.probability || 0) - (b.probInfo.probability || 0));
+  return rows.slice(0, 3);
+}
+
+function formatPhenomenonTitle(entry) {
+  const names = Array.isArray(entry.subjectNames) && entry.subjectNames.length
+    ? entry.subjectNames.join(" + ")
+    : (entry.keys.length ? entry.keys.map(id => (getMonsterById(id) || {}).name).filter(Boolean).join(" + ") : "-");
+  const isMiss = entry.context?.kind === "MISS" || String(entry.phase || "").includes("MISS");
+  const eventType = `${entry.eventType || "SINGLE"}${isMiss ? " MISS" : ""}`;
+  return `${names || "-"} (${eventType})`;
+}
+
+function renderPhenomenonBadges(entry) {
+  const badges = [];
+  const roundType = entry.context?.roundType;
+  const mode = entry.context?.mode;
+  if (roundType === "SINGLE") badges.push(`<span class="journal-badge context">S</span>`);
+  if (roundType === "PAIR" && mode === "ANY") badges.push(`<span class="journal-badge context">PA</span>`);
+  if (roundType === "PAIR" && mode === "FIRST") badges.push(`<span class="journal-badge context">P1</span>`);
+  if (roundType === "PAIR" && mode === "SECOND") badges.push(`<span class="journal-badge context">P2</span>`);
+  if (roundType === "PAIR" && mode === "PAIR_ORDERED") badges.push(`<span class="journal-badge context">PO</span>`);
+  if (entry.context?.kind === "MISS" || String(entry.phase).includes("MISS")) {
+    badges.push(`<span class="journal-badge drought">DROUGHT</span>`);
+  } else {
+    badges.push(`<span class="journal-badge chain">STREAK</span>`);
+  }
+  return badges.join("");
+}
+
+function renderPhenomenonPanel() {
+  const el = document.getElementById("phenomenon-list");
+  if (!el) return;
+
+  const rows = getPhenomenonRows();
+  if (!rows.length) {
+    el.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noPhenomenon"))}</div>`;
+    return;
+  }
+
+  el.innerHTML = rows.map(row => {
+    const entry = row.entry;
+    const probInfo = row.probInfo;
+    const formula = buildProbabilityFormula(entry);
+    const tooltip = formula ? ` title="${escapeHtml(formula)}"` : "";
+    const oddsText = probInfo.probability != null ? formatOddsDenominator(probInfo.probability) : "-";
+    const diffText = probInfo.difficulty != null ? probInfo.difficulty.toFixed(2) : "-";
+    return `
+      <div class="phenomenon-item"${tooltip}>
+        <div class="phenomenon-top">
+          <div class="phenomenon-title">${escapeHtml(formatPhenomenonTitle(entry))}</div>
+          <div class="phenomenon-badges">${renderPhenomenonBadges(entry)}</div>
+        </div>
+        <div class="phenomenon-meta">
+          <span>${escapeHtml(t("label.len"))}: <b>${escapeHtml(String(entry.length))}</b></span>
+          <span>Prob: <b>%${escapeHtml(String(probInfo.pct || "-"))}</b></span>
+          <span>Odds: <b>${escapeHtml(oddsText)}</b></span>
+        </div>
+        <div class="phenomenon-foot">Diff: ${escapeHtml(diffText)}</div>
+      </div>`;
+  }).join("");
 }
 
 function renderProbabilityLeaderboard() {
