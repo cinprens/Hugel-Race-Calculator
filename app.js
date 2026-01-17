@@ -25,6 +25,10 @@ const LS_KEYS = ["prob_hugel_state_v2", "prob_hugel_state", "prob_hugel_state_v1
 
 window.onload = () => {
   loadState();
+  if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
+    rebuildJournalFromHistory();
+    saveState();
+  }
   const hashPage =
     location.hash === "#journal" ? "journal" :
     (location.hash === "#main" ? "main" : null);
@@ -288,6 +292,36 @@ function updateJournalFromStreakChange(prevInput, currInput, roundCtx, opts = {}
 }
 
 
+function rebuildJournalFromHistory() {
+  const history = Array.isArray(state.history) ? state.history : [];
+  const target = [];
+  let prevSnap = snapshotWithCompat({ singles: {}, pair: { key: null, len: 0 } });
+  const tempHistory = [];
+  const ordered = history.slice().reverse();
+
+  ordered.forEach(round => {
+    tempHistory.unshift(round);
+    const currSnap = computeCurrentStreakState(tempHistory, monsters);
+    updateJournalFromStreakChange(prevSnap, currSnap, round, {
+      target,
+      thresholds: resolveJournalThresholds(state.journalSettings),
+      settings: state.journalSettings
+    });
+    prevSnap = snapshotWithCompat(currSnap);
+  });
+
+  state.journal = target;
+  state.journalSelected = 0;
+  state._streakSnapshot = snapshotWithCompat(prevSnap);
+  state.streaks = snapshotWithCompat(prevSnap);
+}
+
+function startJournalComputation() {
+  rebuildJournalFromHistory();
+  saveState();
+  renderJournal(true);
+  updateStats();
+}
 
 
 
@@ -488,10 +522,78 @@ function journalMeta(e) {
 }
 
 // ---------- IMPORT / EXPORT ----------
+function downloadJournal(format) {
+  const entries = Array.isArray(state.journal) ? state.journal : [];
+  if (format === "json") {
+    downloadBlob(JSON.stringify({ journal: entries }, null, 2), "application/json", "hugel-journal.json");
+    return;
+  }
 
+  const header = ["ts", "roundId", "type", "streakType", "subjectKey", "subjectNames", "len", "probPct", "probOneIn"];
+  const rows = entries.map(e => [
+    e.ts || "",
+    e.roundId ?? "",
+    e.type || "",
+    e.streakType || "",
+    e.subjectKey || "",
+    Array.isArray(e.subjectNames) ? e.subjectNames.join(" + ") : "",
+    e.len ?? "",
+    e.prob?.pct ?? "",
+    e.prob?.oneIn ?? ""
+  ]);
+  const csv = [header, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
+  downloadBlob(csv, "text/csv;charset=utf-8", "hugel-journal.csv");
+}
 
+function copyJournalJson() {
+  const entries = Array.isArray(state.journal) ? state.journal : [];
+  const payload = JSON.stringify({ journal: entries }, null, 2);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(payload);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = payload;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
 
+function clearJournal() {
+  if (!confirm("Defteri temizlemek istiyor musun?")) return;
+  resetJournal();
+}
 
+function triggerImport() {
+  const input = document.getElementById("importHistoryFile");
+  if (input) input.click();
+}
+
+function handleImportFile(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result || ""));
+      const history = Array.isArray(data) ? data : (Array.isArray(data.history) ? data.history : []);
+      if (!Array.isArray(history)) return;
+      state.history = history;
+      rebuildJournalFromHistory();
+      saveState();
+      render();
+      updateStats();
+      renderJournal(true);
+    } catch (err) {
+      console.warn("Import failed:", err);
+    }
+  };
+  reader.readAsText(file);
+}
 
 // ---------- MAIN LOGIC ----------
 function submitRound() {
