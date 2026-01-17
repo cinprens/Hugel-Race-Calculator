@@ -87,13 +87,6 @@ FIXLOG
         <div id="raw-alert" class="raw-warning">ÖNEMLİ DİKKAT: UZUN SÜREDİR RAW GELMEDİ!</div>
 
         <div class="panel">
-            <h3>Seriler & İhtimaller</h3>
-            <div id="streak-list">
-                <div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>
-            </div>
-        </div>
-
-        <div class="panel">
             <h3>Kazanma Sıklığı</h3>
             <div id="heatmap-list"></div>
         </div>
@@ -127,8 +120,8 @@ FIXLOG
     <div id="page-journal" class="page">
         <div class="layout-grid journal-page-grid">
             <div class="journal-page-left">
-                <div class="panel">
-                    <h3>Defter Kontrol</h3>
+            <div class="panel">
+                <h3>Defter Kontrol</h3>
                     <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
                         <button class="journal-btn" onclick="startJournalComputation()">Hesaplamayı Başlat</button>
                         <button class="journal-btn" onclick="renderJournal(true)">Listele</button>
@@ -141,6 +134,11 @@ FIXLOG
                         <button class="journal-btn" onclick="copyJournalJson()">JSON Kopyala</button>
                         <button class="journal-btn" onclick="clearJournal()">Defteri Temizle</button>
                     </div>
+                </div>
+                <div class="panel">
+                    <h3>Hata Günlüğü</h3>
+                    <div id="journal-error-list" class="journal-long-list"></div>
+                    <div id="journal-error-empty" class="journal-empty" style="display:none;">Henüz hata yok.</div>
                 </div>
                 <div class="panel">
                     <h3>Uzun Kayıtlar</h3>
@@ -160,6 +158,12 @@ FIXLOG
                 <div class="panel">
                     <h3>Özet</h3>
                     <div id="journal-summary-page" class="journal-detail-card"></div>
+                </div>
+                <div class="panel">
+                    <h3>Seriler & İhtimaller</h3>
+                    <div id="streak-list-journal">
+                        <div style="text-align:center; color:#444; font-size:0.8rem;">Aktif seri bulunamadı.</div>
+                    </div>
                 </div>
                 <div class="panel">
                     <h3>En Şanslı 3 Streak</h3>
