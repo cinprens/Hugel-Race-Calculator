@@ -52,6 +52,15 @@ FIXLOG
 
         <button class="action-btn" onclick="submitRound()" data-i18n="button.process">VERİYİ İŞLE</button>
         <div id="status-text" style="text-align:center; margin-top:15px; color:#555; font-size:0.9rem;" data-i18n="status.waiting">Bahis Bekleniyor...</div>
+
+        <div class="panel top-pairs-panel">
+            <div class="top-pairs-header">
+                <h3 data-i18n="panel.topPairsToday">Bugünün En Çok Gelen 6 Çiftlisi</h3>
+                <span id="top-pairs-date" class="top-pairs-date"></span>
+            </div>
+            <div id="top-pairs-list" class="top-pairs-list"></div>
+            <div id="top-pairs-empty" class="top-pairs-empty" data-i18n="text.noTopPairs" style="display:none;">Bugün kayıt yok.</div>
+        </div>
     </div>
 
     <div class="stats-tower">
@@ -59,26 +68,46 @@ FIXLOG
         <div class="panel" style="border-top:3px solid var(--kick-green);">
             <h3 data-i18n="panel.cash">Kasa Durumu</h3>
             <div class="scoreboard">
-                <div class="total-medals" id="ui-medals">0</div>
-                <div style="color:#555; font-size:0.8rem; font-weight:bold; letter-spacing:1px;" data-i18n="label.totalMedals">TOPLAM MADALYA</div>
-                
-                <div class="sub-stats">
-                    <div style="text-align:left;">
-                        <span style="display:block; color:#555; font-size:0.7rem;" data-i18n="label.spent">HARCANAN</span>
-                        <span id="ui-zeny" style="color:var(--danger)">0z</span>
+                <div class="cash-top">
+                    <div class="total-medals" id="ui-medals">0</div>
+                    <div class="cash-label" data-i18n="label.totalMedals">TOPLAM MADALYA</div>
+                </div>
+
+                <div class="cash-grid">
+                    <div class="cash-card">
+                        <span data-i18n="label.spent">HARCANAN</span>
+                        <b id="ui-zeny">0z</b>
                     </div>
-                    <div style="text-align:right;">
-                        <span style="display:block; color:#555; font-size:0.7rem;" data-i18n="label.winRate">WIN RATE</span>
-                        <span id="ui-winrate" style="color:var(--kick-green)">%0.0</span>
+                    <div class="cash-card">
+                        <span data-i18n="label.winRate">WIN RATE</span>
+                        <b id="ui-winrate">%0.0</b>
+                    </div>
+                    <div class="cash-card">
+                        <span data-i18n="label.entrySummary">Giriş</span>
+                        <b id="ui-entry-summary">0</b>
+                    </div>
+                    <div class="cash-card">
+                        <span data-i18n="label.rewardCount">ÖDÜL SAYISI</span>
+                        <b id="ui-reward-count">0</b>
                     </div>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.75rem; color:#9a9a9a;">
-                    <span data-i18n="label.entrySummary">Giriş</span>
-                    <b id="ui-entry-summary" style="color:#fff;">0</b>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.75rem; color:#9a9a9a;">
-                    <span data-i18n="label.rewardEstimate">ÖDÜL TAHMİNİ</span>
-                    <b id="ui-reward-estimate" style="color:#fff;">0</b>
+
+                <div class="cash-status">
+                    <div class="cash-status-title" data-i18n="label.status">Status</div>
+                    <div class="cash-status-grid">
+                        <div>
+                            <span data-i18n="label.totalRounds">Toplam Tur</span>
+                            <b id="ui-rounds">0</b>
+                        </div>
+                        <div>
+                            <span data-i18n="label.totalWins">Toplam Kazanılan</span>
+                            <b id="ui-wins">0</b>
+                        </div>
+                        <div>
+                            <span data-i18n="label.totalLosses">Toplam Kaybedilen</span>
+                            <b id="ui-losses">0</b>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -112,21 +141,17 @@ FIXLOG
                     <span data-i18n="label.entryCount">Giriş adedi (bu tur)</span>
                     <input type="number" id="entryCount" oninput="handleConfigInput('entryCount', this.value)">
                 </label>
+                <div class="settings-static">
+                    <span data-i18n="label.entryCostFixed">Giriş ücreti (karakter başı)</span>
+                    <strong>2000z</strong>
+                </div>
                 <label>
-                    <span data-i18n="label.entryCostZeny">Giriş ücreti (Zeny / giriş)</span>
-                    <input type="number" id="entryCostZeny" oninput="handleConfigInput('entryCostZeny', this.value)">
+                    <span data-i18n="label.medalsPerWin">Kazanma başına madalya</span>
+                    <input type="number" id="medalsPerWin" oninput="handleConfigInput('medalsPerWin', this.value)">
                 </label>
                 <label>
-                    <span data-i18n="label.medalsPerReward">1 ödül için gereken madalya</span>
-                    <input type="number" id="medalsPerReward" oninput="handleConfigInput('medalsPerReward', this.value)">
-                </label>
-                <label>
-                    <span data-i18n="label.rewardValue">1 ödül değeri</span>
-                    <input type="number" id="rewardValue" oninput="handleConfigInput('rewardValue', this.value)">
-                </label>
-                <label>
-                    <span data-i18n="label.archiveLimit">Arşiv limiti (kayıt sayısı)</span>
-                    <input type="number" id="archiveLimit" oninput="handleConfigInput('archiveLimit', this.value)">
+                    <span data-i18n="label.rewardCostMedals">1 ödül için gereken madalya</span>
+                    <input type="number" id="rewardCostMedals" oninput="handleConfigInput('rewardCostMedals', this.value)">
                 </label>
             </div>
             <button onclick="resetConfig()" style="width:100%; background:#222; border:none; color:#d63031; font-size:0.7rem; cursor:pointer; padding:5px;" data-i18n="button.resetAll">RESET</button>
@@ -188,6 +213,11 @@ FIXLOG
                 <div class="panel">
                     <h3 data-i18n="panel.summary">Özet</h3>
                     <div id="journal-summary-page" class="journal-detail-card"></div>
+                </div>
+                <div class="panel">
+                    <h3 data-i18n="panel.dailyStats">Günlük Oyun Özeti</h3>
+                    <div id="journal-daily-list" class="daily-list"></div>
+                    <div id="journal-daily-empty" class="journal-empty" style="display:none;" data-i18n="text.noDailyStats">Henüz günlük kayıt yok.</div>
                 </div>
                 <div class="panel">
                     <h3 data-i18n="panel.streaksProb">Seriler & İhtimaller</h3>

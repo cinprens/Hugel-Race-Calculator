@@ -170,9 +170,56 @@
         }
 
         /* 1. SCOREBOARD */
-        .scoreboard { text-align: center; padding: 10px 0; }
+        .scoreboard { display: grid; gap: 14px; padding: 6px 0 2px; }
+        .cash-top { text-align: center; }
         .total-medals { font-size: 3rem; font-weight: 900; color: var(--gold); line-height: 1; text-shadow: 0 0 20px rgba(251, 191, 36, 0.2); }
-        .sub-stats { display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.9rem; font-weight: 600; }
+        .cash-label { color: #666; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; }
+        .cash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .cash-card {
+            background: #0f0f0f;
+            border: 1px solid #1f1f1f;
+            border-radius: 10px;
+            padding: 10px;
+            display: grid;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: #9a9a9a;
+        }
+        .cash-card b { color: #fff; font-size: 0.9rem; }
+        .cash-card b#ui-zeny { color: var(--danger); }
+        .cash-card b#ui-winrate { color: var(--kick-green); }
+        .cash-status {
+            border-top: 1px dashed #2a2a2a;
+            padding-top: 12px;
+            display: grid;
+            gap: 10px;
+        }
+        .cash-status-title { font-size: 0.7rem; color: #6f6f6f; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+        .cash-status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .cash-status-grid div {
+            background: #101010;
+            border: 1px solid #1f1f1f;
+            border-radius: 8px;
+            padding: 8px;
+            display: grid;
+            gap: 4px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #8d8d8d;
+        }
+        .cash-status-grid b { color: #fff; font-size: 0.9rem; }
+
+        .settings-static {
+            display: grid;
+            gap: 6px;
+            background: #0f0f0f;
+            border: 1px solid #1f1f1f;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.7rem;
+            color: #9a9a9a;
+        }
+        .settings-static strong { color: #fff; font-size: 0.85rem; }
         
         /* 2. STREAKS & PROBABILITY */
         .streak-row {
@@ -262,6 +309,51 @@
         .journal-page-grid { grid-template-columns: 1.2fr 0.8fr; }
         .journal-page-left { display: flex; flex-direction: column; gap: 15px; }
         .journal-page-right { display: flex; flex-direction: column; gap: 15px; }
+
+        .top-pairs-panel { margin-top: 16px; }
+        .top-pairs-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+        .top-pairs-date { font-size: 0.7rem; color: #7a7a7a; }
+        .top-pairs-list { display: grid; gap: 8px; margin-top: 10px; }
+        .top-pairs-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+            background: #0f0f0f;
+            border: 1px solid #1f1f1f;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.75rem;
+            color: #b5b5b5;
+        }
+        .top-pairs-row b { color: #fff; }
+        .top-pairs-count {
+            background: rgba(83, 252, 24, 0.12);
+            color: var(--kick-green);
+            border: 1px solid rgba(83, 252, 24, 0.35);
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 800;
+        }
+        .top-pairs-empty { text-align: center; color: #555; font-size: 0.75rem; padding: 8px; }
+
+        .daily-list { display: grid; gap: 8px; }
+        .daily-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+            background: #0f0f0f;
+            border: 1px solid #1f1f1f;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.75rem;
+            color: #b5b5b5;
+        }
+        .daily-date { font-weight: 700; color: #fff; }
+        .daily-metrics { display: flex; gap: 10px; font-size: 0.7rem; color: #9a9a9a; }
+        .daily-metrics b { color: #fff; font-size: 0.8rem; }
         .journal-long-meta { display: flex; justify-content: space-between; font-size: 0.7rem; color: #9a9a9a; margin-bottom: 8px; }
         .journal-long-list { max-height: 520px; overflow-y: auto; padding-right: 4px; display: grid; gap: 8px; }
         .leaderboard-list { display: grid; gap: 8px; }

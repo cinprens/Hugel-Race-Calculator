@@ -1,4 +1,4 @@
-// ONLINE RESİM KAYNAKLARI (Garantili çalışırlar)
+﻿// ONLINE RESİM KAYNAKLARI (Garantili çalışırlar)
 const monsters = [
   { id: 1, name: "Poring",  url: "https://static.divine-pride.net/images/mobs/png/1002.png" },
   { id: 2, name: "Lunatic", url: "https://static.divine-pride.net/images/mobs/png/1063.png" },
@@ -9,12 +9,12 @@ const monsters = [
 ];
 const MONSTER_COUNT = monsters.length;
 const CONFIG_KEY = "hugel_config_v2";
+const ENTRY_COST_ZENY = 2000;
 const CONFIG_DEFAULTS = {
   entryCount: 12,
-  entryCostZeny: 2000,
-  medalsPerReward: 15,
-  archiveLimit: 2000,
-  rewardValue: 25
+  entryCostZeny: ENTRY_COST_ZENY,
+  medalsPerWin: 15,
+  rewardCostMedals: 25
 };
 
 let state = {
@@ -63,7 +63,7 @@ const translations = {
     "label.totalMedals": "TOPLAM MADALYA",
     "label.spent": "TOPLAM HARCAMA",
     "label.winRate": "WIN RATE",
-    "label.rewardEstimate": "ÖDÜL TAHMİNİ",
+    "label.rewardCount": "ÖDÜL SAYISI",
     "panel.manualMedals": "Manuel Madalya",
     "button.add": "Ekle",
     "label.totalManual": "Toplam Manuel",
@@ -72,12 +72,16 @@ const translations = {
     "panel.heatmap": "Kazanma Sıklığı",
     "panel.settings": "Özel Ayarlar",
     "panel.phenomenon": "🔥 Fenomenler (En Nadir Kanıtlar)",
-    "label.entryCount": "Giriş adedi (bu tur)",
-    "label.entryCostZeny": "Giriş ücreti (Zeny / giriş)",
-    "label.medalsPerReward": "1 ödül için gereken madalya",
-    "label.archiveLimit": "Arşiv limiti (kayıt sayısı)",
-    "label.rewardValue": "1 ödül değeri",
-    "label.entrySummary": "Giriş",
+    "panel.topPairsToday": "Bugünün En Çok Gelen 6 Çiftlisi",
+    "label.entryCount": "Karakter sayısı (bu tur)",
+    "label.entryCostFixed": "Giriş ücreti (karakter başı)",
+    "label.medalsPerWin": "Kazanma başına madalya",
+    "label.rewardCostMedals": "1 ödül için gereken madalya",
+    "label.entrySummary": "Giriş Özeti",
+    "label.status": "Durum",
+    "label.totalRounds": "Toplam Tur",
+    "label.totalWins": "Toplam Kazanılan",
+    "label.totalLosses": "Toplam Kaybedilen",
     "button.resetAll": "RESET",
     "panel.archiveControl": "Arşiv Kontrolü",
     "button.compute": "Hesaplamayı Başlat",
@@ -102,15 +106,21 @@ const translations = {
     "text.noActiveStreak": "Aktif seri bulunamadı.",
     "panel.topProb": "En Düşük 3 Olasılık",
     "panel.top3": "En Şanslı 3 Seri",
+    "panel.dailyStats": "Günlük Oyun Özeti",
     "error.label": "Hata",
     "text.noEntry": "Kayıt yok.",
     "text.noData": "Veri yok.",
     "text.noEnd": "Henüz END yok.",
     "text.noProb": "Veri yok.",
     "text.noPhenomenon": "Henüz fenomen yok.",
+    "text.noTopPairs": "Bugün kayıt yok.",
+    "text.noDailyStats": "Henüz günlük kayıt yok.",
     "summary.title": "Arşiv Özeti",
     "journal.round": "Tur kaydı",
     "label.winFrequencySnapshot": "Kazanma Sıklığı (snapshot)",
+    "label.roundsShort": "Tur",
+    "label.winsShort": "Kazanma",
+    "label.lossesShort": "Kaybetme",
     "confirm.clearArchive": "Arşivi temizlemek istiyor musun?",
     "confirm.resetAll": "Tüm geçmiş ve arşiv sıfırlansın mı?",
     "error.archiveEmpty": "Arşiv oluşturulamadı: geçmiş var ama arşiv boş kaldı.",
@@ -138,7 +148,7 @@ const translations = {
     "label.totalMedals": "TOTAL MEDALS",
     "label.spent": "TOTAL SPEND",
     "label.winRate": "WIN RATE",
-    "label.rewardEstimate": "REWARD ESTIMATE",
+    "label.rewardCount": "REWARD COUNT",
     "panel.manualMedals": "Manual Medals",
     "button.add": "Add",
     "label.totalManual": "Manual Total",
@@ -147,12 +157,16 @@ const translations = {
     "panel.heatmap": "Win Frequency",
     "panel.settings": "Advanced Settings",
     "panel.phenomenon": "🔥 Phenomena (Rarest Evidence)",
-    "label.entryCount": "Entry count (this run)",
-    "label.entryCostZeny": "Entry cost (Zeny per entry)",
-    "label.medalsPerReward": "Medals needed per reward",
-    "label.archiveLimit": "Archive limit (entries)",
-    "label.rewardValue": "Reward value",
-    "label.entrySummary": "Entry",
+    "panel.topPairsToday": "Top 6 Pairs Today",
+    "label.entryCount": "Characters this run",
+    "label.entryCostFixed": "Entry cost (per character)",
+    "label.medalsPerWin": "Medals per win",
+    "label.rewardCostMedals": "Medals needed per reward",
+    "label.entrySummary": "Entry Summary",
+    "label.status": "Status",
+    "label.totalRounds": "Total Rounds",
+    "label.totalWins": "Total Wins",
+    "label.totalLosses": "Total Losses",
     "button.resetAll": "RESET",
     "panel.archiveControl": "Archive Control",
     "button.compute": "Rebuild",
@@ -177,15 +191,21 @@ const translations = {
     "text.noActiveStreak": "No active streaks.",
     "panel.topProb": "Top 3 Lowest Odds",
     "panel.top3": "Top 3 Luckiest Streaks",
+    "panel.dailyStats": "Daily Play Summary",
     "error.label": "Error",
     "text.noEntry": "No record.",
     "text.noData": "No data.",
     "text.noEnd": "No END yet.",
     "text.noProb": "No data.",
     "text.noPhenomenon": "No phenomena yet.",
+    "text.noTopPairs": "No records today.",
+    "text.noDailyStats": "No daily records yet.",
     "summary.title": "Archive Summary",
     "journal.round": "Round entry",
     "label.winFrequencySnapshot": "Win Frequency (snapshot)",
+    "label.roundsShort": "Rounds",
+    "label.winsShort": "Wins",
+    "label.lossesShort": "Losses",
     "confirm.clearArchive": "Do you want to clear the archive?",
     "confirm.resetAll": "Reset all history and archive?",
     "error.archiveEmpty": "Archive not created: history exists but archive is empty.",
@@ -240,16 +260,11 @@ function normalizeConfig(input = {}) {
     const parsed = parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : fallback;
   };
-  const toFloat = (value, fallback) => {
-    const parsed = parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
   return {
     entryCount: Math.max(1, toInt(input.entryCount ?? input.analysisWindowRounds, base.entryCount)),
-    entryCostZeny: Math.max(0, toInt(input.entryCostZeny ?? input.ticketCost, base.entryCostZeny)),
-    medalsPerReward: Math.max(1, toInt(input.medalsPerReward, base.medalsPerReward)),
-    archiveLimit: Math.max(1, toInt(input.archiveLimit, base.archiveLimit)),
-    rewardValue: Math.max(0, toFloat(input.rewardValue, base.rewardValue))
+    entryCostZeny: ENTRY_COST_ZENY,
+    medalsPerWin: Math.max(1, toInt(input.medalsPerWin ?? input.medalsPerReward ?? input.medalReward, base.medalsPerWin)),
+    rewardCostMedals: Math.max(1, toInt(input.rewardCostMedals ?? input.rewardValue ?? input.prizeCost, base.rewardCostMedals))
   };
 }
 
@@ -272,9 +287,8 @@ function loadLegacyConfig() {
         const mapped = {
           entryCount: parsed.entryCount ?? parsed.analysisWindowRounds ?? parsed.charCount,
           entryCostZeny: parsed.entryCostZeny ?? parsed.ticketCost,
-          medalsPerReward: parsed.medalReward,
-          archiveLimit: parsed.archiveLimit ?? parsed.ticketCost,
-          rewardValue: parsed.prizeCost
+          medalsPerWin: parsed.medalsPerWin ?? parsed.medalReward ?? parsed.medalsPerReward,
+          rewardCostMedals: parsed.rewardCostMedals ?? parsed.rewardValue ?? parsed.prizeCost
         };
         if (Object.values(mapped).some(v => v != null)) return mapped;
       }
@@ -302,29 +316,16 @@ function loadConfig() {
   saveConfig();
 }
 
-function applyArchiveLimit() {
-  const limit = Math.max(1, parseInt(state.config?.archiveLimit, 10) || CONFIG_DEFAULTS.archiveLimit);
-  if (!Array.isArray(state.journal)) return false;
-  if (state.journal.length <= limit) return false;
-  state.journal = state.journal.slice(0, limit);
-  state.journalSelected = clamp(state.journalSelected || 0, 0, state.journal.length - 1);
-  return true;
-}
-
 function setConfig(patch = {}) {
   state.config = normalizeConfig({ ...state.config, ...patch });
   saveConfig();
-  const trimmed = applyArchiveLimit();
-  if (trimmed) saveState();
   renderSettingsInputs();
   updateStats();
-  if (trimmed) renderJournal();
 }
 
 function handleConfigInput(field, rawValue) {
   if (!field) return;
-  const parser = field === "rewardValue" ? parseFloat : (value) => parseInt(value, 10);
-  const parsed = parser(rawValue);
+  const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) {
     renderSettingsInputs();
     return;
@@ -335,8 +336,6 @@ function handleConfigInput(field, rawValue) {
 function resetConfig() {
   state.config = { ...CONFIG_DEFAULTS };
   saveConfig();
-  const trimmed = applyArchiveLimit();
-  if (trimmed) saveState();
   renderSettingsInputs();
   updateStats();
   renderJournal();
@@ -345,7 +344,6 @@ function resetConfig() {
 window.onload = () => {
   loadConfig();
   loadState();
-  applyArchiveLimit();
   try { state.language = localStorage.getItem("prob_hugel_lang") || "tr"; }
   catch { state.language = "tr"; }
   if (state.history.length && (!Array.isArray(state.journal) || !state.journal.length)) {
@@ -435,10 +433,8 @@ function renderSettingsInputs() {
   const cfg = state.config || CONFIG_DEFAULTS;
   const map = {
     entryCount: "entryCount",
-    entryCostZeny: "entryCostZeny",
-    medalsPerReward: "medalsPerReward",
-    archiveLimit: "archiveLimit",
-    rewardValue: "rewardValue"
+    medalsPerWin: "medalsPerWin",
+    rewardCostMedals: "rewardCostMedals"
   };
   Object.entries(map).forEach(([key, id]) => {
     const el = document.getElementById(id);
@@ -1213,7 +1209,6 @@ function rebuildJournalFromHistory() {
     state.journalSelected = 0;
     state._streakSnapshot = snapshotWithCompat(prevSnap);
     state.streaks = snapshotWithCompat(prevSnap);
-    applyArchiveLimit();
 
     if (history.length && !target.length) {
       logJournalError(t("error.archiveRebuildEmpty"), {
@@ -1255,6 +1250,7 @@ function renderJournal(forceRefresh = false) {
     empty.style.display = "block";
     if (detail) detail.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEntry"))}</div>`;
     if (summary) summary.innerHTML = renderJournalSummaryHtml();
+    renderDailyStats();
     if (leaderboard) leaderboard.innerHTML = `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noData"))}</div>`;
     return;
   }
@@ -1269,6 +1265,7 @@ function renderJournal(forceRefresh = false) {
   // right panels
   if (detail) detail.innerHTML = renderJournalDetailHtml(entries[safeSel]);
   if (summary) summary.innerHTML = renderJournalSummaryHtml();
+  renderDailyStats();
   if (leaderboard) leaderboard.innerHTML = renderLeaderboardHtml(entries);
   renderProbabilityLeaderboard();
   renderJournalErrors();
@@ -1492,6 +1489,46 @@ function renderJournalSummaryHtml() {
   `;
 }
 
+function renderDailyStats() {
+  const list = document.getElementById("journal-daily-list");
+  const empty = document.getElementById("journal-daily-empty");
+  if (!list || !empty) return;
+
+  const history = Array.isArray(state.history) ? state.history : [];
+  const daily = {};
+  history.forEach(round => {
+    const key = toDateKey(new Date(round.id));
+    if (!key) return;
+    if (!daily[key]) daily[key] = { dateKey: key, rounds: 0, wins: 0, losses: 0 };
+    daily[key].rounds += 1;
+    if (round.win) daily[key].wins += 1;
+    else daily[key].losses += 1;
+  });
+
+  const rows = Object.values(daily).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  if (!rows.length) {
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+
+  empty.style.display = "none";
+  const locale = state.language === "en" ? "en-US" : "tr-TR";
+  list.innerHTML = rows.map(row => {
+    const parts = row.dateKey.split("-").map(Number);
+    const date = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    const label = Number.isNaN(date.getTime()) ? row.dateKey : date.toLocaleDateString(locale);
+    return `<div class="daily-row">
+      <div class="daily-date">${escapeHtml(label)}</div>
+      <div class="daily-metrics">
+        <span><b>${fmtNum(row.rounds)}</b> ${escapeHtml(t("label.roundsShort"))}</span>
+        <span><b>${fmtNum(row.wins)}</b> ${escapeHtml(t("label.winsShort"))}</span>
+        <span><b>${fmtNum(row.losses)}</b> ${escapeHtml(t("label.lossesShort"))}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 function renderLeaderboardHtml(entries) {
   const streakEnds = entries.filter(e => normalizeEntry(e).phase === "END" && buildProbabilityInfo(e, MONSTER_COUNT).probability != null);
   if (!streakEnds.length) return `<div style="color:#444; font-size:0.8rem; text-align:center;">${escapeHtml(t("text.noEnd"))}</div>`;
@@ -1687,7 +1724,6 @@ function submitRound() {
   updateJournalFromStreakChange(prevSnap, currSnap, round);
   state._streakSnapshot = snapshotWithCompat(currSnap);
   state.streaks = snapshotWithCompat(currSnap);
-  applyArchiveLimit();
 
   // clear selections for next input
   state.bet = [];
@@ -1798,28 +1834,32 @@ function resetExtraMedals() {
 function updateStats() {
   const cfg = normalizeConfig(state.config || CONFIG_DEFAULTS);
   const entryCount = clampInt(cfg.entryCount, 1, 999999);
-  const entryCostZeny = clampInt(cfg.entryCostZeny, 0, 999999999);
-  const medalReward = clampInt(cfg.medalsPerReward, 1, 999999);
-  const prizeCost = Number.isFinite(cfg.rewardValue) ? cfg.rewardValue : CONFIG_DEFAULTS.rewardValue;
+  const entryCostZeny = ENTRY_COST_ZENY;
+  const medalsPerWin = clampInt(cfg.medalsPerWin, 1, 999999);
+  const rewardCostMedals = clampInt(cfg.rewardCostMedals, 1, 999999);
 
   const rounds = state.history.length;
   const wins = state.history.filter(r => !!r.win).length;
+  const losses = Math.max(0, rounds - wins);
 
   const spentZenyThisRun = entryCount * entryCostZeny;
   const spentZenyTotal = rounds * entryCount * entryCostZeny;
-  const earnedMedals = wins * medalReward;
+  const earnedMedals = wins * medalsPerWin;
   const totalMedals = earnedMedals + (state.extraMedals || 0);
-  const rewardCount = medalReward > 0 ? Math.floor(totalMedals / medalReward) : 0;
-  const rewardEstimate = rewardCount * prizeCost;
+  const rewardCount = rewardCostMedals > 0 ? (totalMedals / rewardCostMedals) : 0;
 
   setText("ui-zeny", `${fmtNum(spentZenyTotal)}z`);
   setText("ui-extra-medals", fmtNum(state.extraMedals || 0));
   setText("ui-medals", fmtNum(totalMedals));
   setText("ui-winrate", rounds ? `%${((wins / rounds) * 100).toFixed(1)}` : "%0.0");
-  setText("ui-reward-estimate", fmtNum(rewardEstimate));
+  setText("ui-reward-count", fmtDecimal(rewardCount));
   setText("ui-entry-summary", `${entryCount} × ${fmtNum(entryCostZeny)}z = ${fmtNum(spentZenyThisRun)}z`);
+  setText("ui-rounds", fmtNum(rounds));
+  setText("ui-wins", fmtNum(wins));
+  setText("ui-losses", fmtNum(losses));
 
   renderHistory();
+  renderTopPairsToday();
   renderPhenomenonPanel();
   renderStreakPanel();
   renderProbabilityLeaderboard();
@@ -1842,6 +1882,51 @@ function renderHistory() {
         ${r.win ? "WIN" : "LOSE"}
       </td>
     </tr>`;
+  }).join("");
+}
+
+function renderTopPairsToday() {
+  const listEl = document.getElementById("top-pairs-list");
+  const emptyEl = document.getElementById("top-pairs-empty");
+  const dateEl = document.getElementById("top-pairs-date");
+  if (!listEl || !emptyEl || !dateEl) return;
+
+  const now = new Date();
+  const todayKey = toDateKey(now);
+  const locale = state.language === "en" ? "en-US" : "tr-TR";
+  dateEl.textContent = Number.isNaN(now.getTime()) ? "" : now.toLocaleDateString(locale);
+
+  const counts = {};
+  (state.history || []).forEach(round => {
+    const key = toDateKey(new Date(round.id));
+    if (!key || key !== todayKey) return;
+    if (!Array.isArray(round.result) || round.result.length < 2) return;
+    const a = Math.min(round.result[0], round.result[1]);
+    const b = Math.max(round.result[0], round.result[1]);
+    const pairKey = `${a}-${b}`;
+    counts[pairKey] = (counts[pairKey] || 0) + 1;
+  });
+
+  const pairs = Object.entries(counts)
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => (b.count - a.count) || a.key.localeCompare(b.key))
+    .slice(0, 6);
+
+  if (!pairs.length) {
+    listEl.innerHTML = "";
+    emptyEl.style.display = "block";
+    return;
+  }
+
+  emptyEl.style.display = "none";
+  listEl.innerHTML = pairs.map((pair, idx) => {
+    const ids = pair.key.split("-").map(x => parseInt(x, 10));
+    const nameA = (getMonsterById(ids[0]) || {}).name || `#${ids[0]}`;
+    const nameB = (getMonsterById(ids[1]) || {}).name || `#${ids[1]}`;
+    return `<div class="top-pairs-row">
+      <div><b>#${idx + 1}</b> ${escapeHtml(nameA)} + ${escapeHtml(nameB)}</div>
+      <div class="top-pairs-count">${fmtNum(pair.count)}x</div>
+    </div>`;
   }).join("");
 }
 
@@ -2172,6 +2257,25 @@ function fmtNum(n) {
   catch { return String(n || 0); }
 }
 
+function fmtDecimal(n) {
+  try {
+    return Number(n || 0).toLocaleString("tr-TR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  } catch {
+    return (Number(n || 0)).toFixed(2);
+  }
+}
+
+function toDateKey(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function csvCell(v) {
   const s = String(v ?? "");
   if (s.includes(",") || s.includes("\n") || s.includes('"')) return `"${s.replaceAll('"', '""')}"`;
@@ -2216,3 +2320,4 @@ function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = String(text);
 }
+
